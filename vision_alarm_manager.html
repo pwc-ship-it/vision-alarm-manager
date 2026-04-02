@@ -1724,6 +1724,7 @@ function handleUrl(){
 async function init(){
   initResizers();
   renderFavorites(); renderRecent();
+  // 알람 목록은 즉시 렌더링 (Firebase 기다리지 않음)
   applyFilters(); updateStats(); renderRight();
   // Demo search log seed
   if(searchLog.length===0){
@@ -1734,15 +1735,15 @@ async function init(){
     demo.forEach((k,i)=>{ for(let j=0;j<(8-i)*3;j++) searchLog.push({key:k,ts:now-Math.random()*6*24*3600*1000}); });
     sS('vam_search_log',searchLog);
   }
-  // Firebase init
+  handleUrl();
+  // Firebase는 백그라운드에서 연결 (UI 블로킹 없음)
   console.log('[Init] FB_URL:', FB_URL);
   if(FB_URL){
-    await initFirebase();
+    initFirebase(); // await 제거 - 백그라운드 실행
   } else {
     setDbStatus('offline');
     setTimeout(()=>{ showToast('⚙️ Firebase 버튼을 눌러 URL을 설정하면 팀 공유가 가능합니다'); }, 1500);
   }
-  handleUrl();
 }
 
 init();
