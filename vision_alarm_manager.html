@@ -646,11 +646,11 @@ mark{background:rgba(79,124,255,.22);color:var(--accent);border-radius:2px;paddi
 
 <!-- QR MODAL -->
 <div class="mo" id="qr-mo">
-  <div class="md" style="max-width:340px;text-align:center">
+  <div class="md" style="max-width:360px;text-align:center">
     <div class="md-t">📱 사이트 QR 코드</div>
-    <p style="font-size:11px;color:var(--text3);margin-bottom:14px">스캔하면 바로 접속됩니다</p>
+    <div id="qr-info" style="font-size:11px;margin-bottom:12px;padding:7px 10px;border-radius:var(--r);background:var(--bg3)"></div>
     <div id="qr-canvas" style="display:flex;justify-content:center;margin-bottom:12px"></div>
-    <div id="qr-url" style="font-size:10px;color:var(--text3);word-break:break-all;margin-bottom:10px"></div>
+    <div id="qr-url" style="font-size:10px;color:var(--text3);word-break:break-all;margin-bottom:10px;cursor:pointer" title="클릭하여 전체 URL 보기"></div>
     <div class="md-a">
       <button class="btn sm" onclick="copyQrUrl()">🔗 URL 복사</button>
       <button class="btn" onclick="closeModal('qr-mo')">닫기</button>
@@ -773,6 +773,14 @@ async function fbPatch(path, data){
   } catch(e){ console.error('fbPatch error:', e); return false; }
 }
 
+async function fbDelete(path){
+  if(!FB_URL) return false;
+  try{
+    const r = await fetch(fbPath(path), { method:'DELETE' });
+    return r.ok;
+  } catch(e){ console.error('fbDelete error:', e); return false; }
+}
+
 let pollTimer = null;
 function startPolling(){
   if(pollTimer) clearInterval(pollTimer);
@@ -784,8 +792,10 @@ function startPolling(){
         fbGet('auditLog')
       ]);
       let changed = false;
-      if(actData && JSON.stringify(actData) !== JSON.stringify(actions)){
-        actions = actData; changed = true;
+      // actData가 null이면 Firebase에 actions 없음 = 전부 삭제된 것
+      const newActions = (actData && typeof actData === 'object') ? actData : {};
+      if(JSON.stringify(newActions) !== JSON.stringify(actions)){
+        actions = newActions; changed = true;
       }
       if(auditData){
         const newAudit = Array.isArray(auditData) ? auditData : Object.values(auditData);
@@ -902,7 +912,21 @@ const SCLS = {resolved:'sp resolved', temp:'sp temp', checking:'sp checking', de
 // ══════════════════════════════════════
 async function saveActions(){
   sS('vam_actions', actions);
-  if(fbOnline) await fbPatch('actions', actions);
+  if(!fbOnline) return;
+  // Firebase에 전체 actions 저장 (빈 키는 null로 명시해서 삭제)
+  await fbPatch('actions', actions);
+}
+
+async function saveActionKey(k){
+  // 특정 키만 저장/삭제 (더 정확한 방법)
+  sS('vam_actions', actions);
+  if(!fbOnline) return;
+  if(actions[k]){
+    await fbPatch('actions/' + k.replace(/[.#$[\]]/g,'_'), actions[k]);
+  } else {
+    // 키가 없으면 Firebase에서도 삭제
+    await fbDelete('actions/' + k.replace(/[.#$[\]]/g,'_'));
+  }
 }
 async function saveAlarmEdits(){
   sS('vam_alarm_edits', alarmEdits);
@@ -1215,11 +1239,27 @@ async function deleteAction(k,idx){
   if(!isAdmin){ showToast('관리자 권한이 필요합니다','err'); return; }
   const ac = actions[k]?.[idx];
   if(!ac) return;
-  const confirm = window.confirm(`조치방안을 삭제하시겠습니까?\n\n작성자: ${ac.author}\n내용: ${ac.text.slice(0,50)}${ac.text.length>50?'…':''}`);
-  if(!confirm) return;
+  const confirmed = window.confirm(`조치방안을 삭제하시겠습니까?\n\n작성자: ${ac.author}\n내용: ${ac.text.slice(0,50)}${ac.text.length>50?'…':''}`);
+  if(!confirmed) return;
+
   actions[k].splice(idx, 1);
   if(actions[k].length === 0) delete actions[k];
-  await saveActions();
+
+  // 로컬 저장
+  sS('vam_actions', actions);
+
+  // Firebase: 해당 키만 정확히 업데이트/삭제
+  if(fbOnline){
+    const fbKey = k.replace(/[.#$[\]]/g,'_');
+    if(actions[k]){
+      // 남은 항목 있으면 업데이트
+      await fbPatch('actions/' + fbKey, actions[k]);
+    } else {
+      // 빈 배열이면 Firebase에서 키 완전 삭제
+      await fbDelete('actions/' + fbKey);
+    }
+  }
+
   addAudit('조치방안 삭제', k, 'Admin', ac.text.slice(0,60), '');
   await saveAudit();
   updateStats();
@@ -1618,23 +1658,39 @@ function addNewAlarm(){
 }
 
 function showQR(){
-  const url = location.href.split('?')[0];
-  document.getElementById('qr-url').textContent = url;
+  const base = location.href.split('?')[0];
+  // Firebase URL이 설정되어 있으면 파라미터로 포함
+  const url = FB_URL ? base + '?fburl=' + encodeURIComponent(FB_URL) : base;
+  const displayUrl = url.length > 80 ? url.slice(0,80)+'...' : url;
+  document.getElementById('qr-url').textContent = displayUrl;
+  document.getElementById('qr-url').title = url;
+
   const canvas = document.getElementById('qr-canvas');
   canvas.innerHTML = '';
   const c = document.createElement('canvas');
   canvas.appendChild(c);
   if(typeof QRCode !== 'undefined'){
     QRCode.toCanvas(c, url, {width:200, margin:2, color:{dark:'#e8eaf2',light:'#13161d'}}, err=>{
-      if(err) canvas.innerHTML='<div style="color:var(--red);font-size:12px">QR 생성 실패</div>';
+      if(err) canvas.innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" style="border-radius:8px">`;
     });
   } else {
     canvas.innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&color=e8eaf2&bgcolor=13161d" style="border-radius:8px">`;
   }
+
+  // Firebase 포함 여부 안내
+  const info = document.getElementById('qr-info');
+  if(info){
+    if(FB_URL){
+      info.innerHTML='<span style="color:var(--green)">✅ Firebase URL 포함 — QR 스캔 시 자동 연결됩니다</span>';
+    } else {
+      info.innerHTML='<span style="color:var(--yellow)">⚠️ Firebase 미설정 — 스캔 후 수동 연결 필요</span>';
+    }
+  }
   document.getElementById('qr-mo').classList.add('open');
 }
 function copyQrUrl(){
-  const url=location.href.split('?')[0];
+  const base = location.href.split('?')[0];
+  const url = FB_URL ? base + '?fburl=' + encodeURIComponent(FB_URL) : base;
   try{ navigator.clipboard.writeText(url); showToast('URL 복사됨 🔗','ok'); } catch{ prompt('URL:', url); }
 }
 
@@ -1855,6 +1911,17 @@ function showDpResizer(open){
 function handleUrl(){
   try{
     const p=new URLSearchParams(location.search);
+
+    // fburl 파라미터가 있으면 Firebase 자동 연결
+    const fburl = p.get('fburl');
+    if(fburl && !FB_URL){
+      FB_URL = decodeURIComponent(fburl).replace(/\/+$/, '');
+      localStorage.setItem('vam_fb_url', FB_URL);
+      // Firebase 연결 시작 (백그라운드)
+      initFirebase();
+    }
+
+    // 알람 바로가기
     const v=p.get('v'), t=p.get('t'), c=p.get('c');
     if(v&&t&&c){
       document.getElementById('sel-v').value=v;
