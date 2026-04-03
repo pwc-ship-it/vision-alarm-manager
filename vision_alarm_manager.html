@@ -72,7 +72,15 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .role-badge{font-size:10px;padding:3px 8px;border-radius:20px;background:var(--aglow);
   color:var(--accent);border:1px solid rgba(79,124,255,.3);font-weight:500;cursor:pointer;letter-spacing:.03em}
 
-/* ── MAIN LAYOUT ── */
+/* ── SIDEBAR STATS ── */
+.sb-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.sb-sc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);
+  padding:7px 9px;text-align:center;transition:border-color .15s}
+.sb-sc:hover{border-color:var(--border2)}
+.sb-scn{font-size:20px;font-weight:700;color:var(--accent);font-family:var(--mono);line-height:1}
+.sb-scn.grn{color:var(--green)}
+.sb-scn.red{color:var(--red)}
+.sb-scl{font-size:10px;color:var(--text3);margin-top:3px}
 #main{display:flex;flex:1;overflow:hidden}
 
 /* ── SIDEBAR ── */
@@ -130,6 +138,10 @@ option{background:var(--bg3)}
 .ai.no-act::after{content:'미등록';position:absolute;right:8px;top:50%;transform:translateY(-50%);
   font-size:9px;padding:1px 5px;border-radius:4px;background:var(--redbg);
   color:var(--red);border:1px solid rgba(255,77,106,.2);font-family:var(--mono)}
+.ai.custom-alarm{border-left-color:var(--yellow)!important}
+.ai.custom-alarm::before{background:var(--yellow)!important}
+.custom-badge{font-size:9px;padding:1px 5px;border-radius:4px;background:var(--yellowbg);
+  color:var(--yellow);border:1px solid rgba(255,179,71,.3);font-family:var(--mono)}
 .ai-top{display:flex;align-items:center;gap:5px;margin-bottom:4px;flex-wrap:wrap}
 .ct{font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 6px;border-radius:4px;
   background:var(--bg4);color:var(--accent);border:1px solid rgba(79,124,255,.2)}
@@ -370,13 +382,9 @@ mark{background:rgba(79,124,255,.22);color:var(--accent);border-radius:2px;paddi
   <div id="db-status" class="loading" onclick="openFbSetup()" title="Firebase 연결 상태 · 클릭하여 설정">
     <span class="db-dot"></span><span id="db-txt">⏳ 연결 중...</span>
   </div>
-  <div class="tb-stats">
-    <div class="tbs"><span class="tbs-n" id="st-total">0</span><span>전체</span></div>
-    <div class="tbs"><span class="tbs-n" id="st-acts">0</span><span>조치방안</span></div>
-    <div class="tbs"><span class="tbs-n red" id="st-noact">0</span><span>미등록</span></div>
-  </div>
   <div id="tb-right">
     <button class="btn sm" onclick="openAllActions()">📋 전체 조치방안</button>
+    <button class="btn sm" onclick="openAddAlarmModal()">➕ 알람 추가</button>
     <button class="btn sm" onclick="showQR()">📱 QR</button>
     <button class="btn sm" onclick="openFbSetup()">⚙️ Firebase</button>
     <button class="btn sm ghost" onclick="window.print()">🖨️</button>
@@ -387,6 +395,23 @@ mark{background:rgba(79,124,255,.22);color:var(--accent);border-radius:2px;paddi
 <div id="main">
   <!-- SIDEBAR -->
   <div id="sidebar">
+    <!-- 통계 그리드 -->
+    <div class="sbs" style="padding:10px 13px">
+      <div class="sb-stat-grid">
+        <div class="sb-sc" onclick="document.getElementById('noact-f').checked=false;applyFilters()">
+          <div class="sb-scn" id="st-total">0</div><div class="sb-scl">전체</div>
+        </div>
+        <div class="sb-sc" onclick="document.getElementById('noact-f').checked=false;applyFilters()">
+          <div class="sb-scn grn" id="st-acts">0</div><div class="sb-scl">조치방안</div>
+        </div>
+        <div class="sb-sc" onclick="document.getElementById('noact-f').checked=true;applyFilters()" style="cursor:pointer" title="클릭 시 미등록만 필터">
+          <div class="sb-scn red" id="st-noact">0</div><div class="sb-scl">미등록</div>
+        </div>
+        <div class="sb-sc">
+          <div class="sb-scn grn" id="st-resolved">0</div><div class="sb-scl">해결됨</div>
+        </div>
+      </div>
+    </div>
     <div class="sbs">
       <div class="sbl">Vision 선택</div>
       <select class="fc" id="sel-v" onchange="applyFilters()">
@@ -483,12 +508,6 @@ mark{background:rgba(79,124,255,.22);color:var(--accent);border-radius:2px;paddi
 
   <!-- RIGHT PANEL -->
   <div id="rp">
-    <div class="sc-grid">
-      <div class="scc"><div class="scn" id="r-total">0</div><div class="scl">전체 알람</div></div>
-      <div class="scc"><div class="scn grn" id="r-acts">0</div><div class="scl">조치방안</div></div>
-      <div class="scc"><div class="scn red" id="r-noact">0</div><div class="scl">미등록</div></div>
-      <div class="scc"><div class="scn grn" id="r-resolved">0</div><div class="scl">해결됨</div></div>
-    </div>
     <div class="rps">
       <div class="rpt">TOP 10 조회<div class="rt-tog">
         <button class="rtt on" onclick="setRankP(this,'7d')">7일</button>
@@ -503,7 +522,7 @@ mark{background:rgba(79,124,255,.22);color:var(--accent);border-radius:2px;paddi
     </div>
     <div class="rps">
       <div class="rpt">수정 이력<div class="rt-tog">
-        <button class="rtt" onclick="openHistModal()">전체</button>
+        <button class="rtt" onclick="openHistModal()">전체보기</button>
       </div></div>
       <div id="hist-list"></div>
     </div>
@@ -635,6 +654,76 @@ mark{background:rgba(79,124,255,.22);color:var(--accent);border-radius:2px;paddi
     <div class="md-a">
       <button class="btn sm" onclick="copyQrUrl()">🔗 URL 복사</button>
       <button class="btn" onclick="closeModal('qr-mo')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ALARM MODAL -->
+<div class="mo" id="add-alarm-mo">
+  <div class="md" style="max-width:600px">
+    <div class="md-t">➕ 알람 / 트러블 추가</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">
+      알람 코드 외에 <b style="color:var(--accent)">Vision Focus 이탈, Overkill/Underkill, 공통 Issue</b> 등 자유롭게 등록하세요.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">Vision *</label>
+        <select class="fc" id="na-vision" style="margin-bottom:0">
+          <option value="NotchingVision">NotchingVision</option>
+          <option value="FoilVision">FoilVision</option>
+          <option value="DelaminationVision">DelaminationVision</option>
+          <option value="NGVision">NGVision</option>
+          <option value="Common">Common (공통)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">타입 *</label>
+        <select class="fc" id="na-type" style="margin-bottom:0">
+          <option value="HOST">HOST</option>
+          <option value="Vision">Vision</option>
+          <option value="Trouble">Trouble (비알람 이슈)</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">알람 코드</label>
+        <input class="fc" type="number" id="na-code" placeholder="없으면 비워두기" style="margin-bottom:0">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">알람명 / 이슈명 *</label>
+        <input class="fc" type="text" id="na-name" placeholder="예: Focus 이탈, Overkill 과다 발생" style="margin-bottom:0" maxlength="100">
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">직접 원인</label>
+      <textarea class="fc" id="na-cause" rows="2" placeholder="발생 원인을 입력하세요" style="margin-bottom:0;resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:8px">
+      <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">발생 조건</label>
+      <textarea class="fc" id="na-occur" rows="2" placeholder="어떤 상황에서 발생하는지" style="margin-bottom:0;resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:8px">
+      <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">영향 조건</label>
+      <textarea class="fc" id="na-infl" rows="2" placeholder="어떤 영향을 미치는지" style="margin-bottom:0;resize:vertical"></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">심각도 *</label>
+        <select class="fc" id="na-sev" style="margin-bottom:0">
+          <option value="Critical">Critical</option>
+          <option value="Warning" selected>Warning</option>
+          <option value="Info">Info</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">관련 알람</label>
+        <input class="fc" type="text" id="na-related" placeholder="예: 30, 34" style="margin-bottom:0">
+      </div>
+    </div>
+    <div class="md-a">
+      <button class="btn primary" onclick="addNewAlarm()">➕ 등록</button>
+      <button class="btn" onclick="closeModal('add-alarm-mo')">취소</button>
     </div>
   </div>
 </div>
@@ -836,10 +925,11 @@ function updateStats(){
   const totalActs = Object.values(actions).reduce((s,a)=>s+(Array.isArray(a)?a.length:0), 0);
   const noAct = alarms.filter(a=>(actions[ak(a)]||[]).length===0).length;
   const resolved = Object.values(actions).flat().filter(a=>a&&a.status==='resolved').length;
-  ['st-total','r-total'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=total; });
-  ['st-acts','r-acts'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=totalActs; });
-  ['st-noact','r-noact'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=noAct; });
-  const re=document.getElementById('r-resolved'); if(re)re.textContent=resolved;
+  // 사이드바 통계
+  ['st-total'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=total; });
+  ['st-acts'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=totalActs; });
+  ['st-noact'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=noAct; });
+  const sr=document.getElementById('st-resolved'); if(sr)sr.textContent=resolved;
 }
 
 // ══════════════════════════════════════
@@ -915,12 +1005,14 @@ function renderList(q=''){
     const vcls=g.severity==='Critical'?'vr':g.severity==='Warning'?'vy':'';
     const lastSt=acts.length?acts[acts.length-1].status:'';
     const sdot=lastSt?`<span class="sdot sd-${lastSt}" title="${SLBL[lastSt]||''}"></span>`:'';
-    return `<div class="ai${isCur?' cur':''} ${vcls}${hasActs?'':' no-act'}" onclick="selAlarm(${a.id})" id="ai-${a.id}">
+    const isCustom=a.isCustom?'custom-alarm':'';
+    return `<div class="ai${isCur?' cur':''} ${vcls}${hasActs?'':' no-act'} ${isCustom}" onclick="selAlarm(${a.id})" id="ai-${a.id}">
       <div class="ai-top">
         <span class="ct">C${g.code}</span>
         <span class="sb ${g.severity}">${g.severity}</span>
         <span class="tt">${g.type}</span>
         <span class="vt">${g.vision.replace('Vision','')}</span>
+        ${a.isCustom?'<span class="custom-badge">추가됨</span>':''}
         <button class="star-b ${isFav?'on':''}" onclick="event.stopPropagation();toggleFav('${k}')" title="${isFav?'즐겨찾기 해제':'즐겨찾기'}">★</button>
       </div>
       <div class="ai-name">${hl(g.name,q)}</div>
@@ -1377,7 +1469,7 @@ function renderRight(){
     </div>`;
   }).join(''):'<div style="font-size:11px;color:var(--text3)">기록 없음</div>';
 
-  // Recent actions
+  // Recent actions - 10개로 확장
   const allActs=[];
   Object.entries(actions).forEach(([k,acts])=>{
     if(!Array.isArray(acts)) return;
@@ -1385,20 +1477,22 @@ function renderRight(){
     acts.forEach(ac=>{ if(ac) allActs.push({...ac,_a:a,_k:k}); });
   });
   allActs.sort((a,b)=>new Date(b.date)-new Date(a.date));
-  document.getElementById('recent-acts').innerHTML=allActs.slice(0,6).map(ac=>{
+  document.getElementById('recent-acts').innerHTML=allActs.slice(0,10).map(ac=>{
     const g=ga(ac._a);
     const sCls=SCLS[ac.status||'']||'sp none';
     return `<div class="hi" onclick="jumpTo('${ac._k}')">
       <span class="hi-t">${g.vision.replace('Vision','')} · Code ${g.code}</span>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${esc((ac.text||'').slice(0,38))}${(ac.text||'').length>38?'…':''}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">${esc((ac.text||'').slice(0,45))}${(ac.text||'').length>45?'…':''}</div>
       <div class="hi-m">${ac.date} · ${esc(ac.author)} <span class="${sCls}" style="font-size:9px;padding:1px 5px">${SLBL[ac.status]||'미지정'}</span></div>
     </div>`;
   }).join('')||'<div style="font-size:11px;color:var(--text3)">없음</div>';
 
-  // Audit
-  document.getElementById('hist-list').innerHTML=auditLog.slice(-5).reverse().map(h=>`
+  // Audit - 10개로 확장, 등록/수정/삭제 아이콘 추가
+  const typeIcon={'조치방안 등록':'✅','조치방안 수정':'✏️','조치방안 삭제':'🗑️','알람 정보 수정':'🔧','Excel 업로드':'📤','알람 추가':'➕'};
+  document.getElementById('hist-list').innerHTML=auditLog.slice(-10).reverse().map(h=>`
     <div class="hi">
-      <span class="hi-t">${esc(h.type)}</span>
+      <span class="hi-t">${typeIcon[h.type]||'📝'} ${esc(h.type)}</span>
+      <div style="font-size:10px;color:var(--text2);margin-top:1px">${esc(h.target.split('_').slice(0,3).join(' / '))}</div>
       <div class="hi-m">${esc(h.date)} · ${esc(h.user)}</div>
     </div>`).join('')||'<div style="font-size:11px;color:var(--text3)">없음</div>';
 }
@@ -1471,6 +1565,58 @@ async function saveFbConfig(){
 // ══════════════════════════════════════
 //  SHARE / PRINT / ADMIN
 // ══════════════════════════════════════
+function openAddAlarmModal(){
+  // 폼 초기화
+  ['na-code','na-name','na-cause','na-occur','na-infl','na-related'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('add-alarm-mo').classList.add('open');
+}
+
+function addNewAlarm(){
+  const vision=document.getElementById('na-vision').value;
+  const type=document.getElementById('na-type').value;
+  const codeVal=document.getElementById('na-code').value.trim();
+  const name=document.getElementById('na-name').value.trim();
+  const cause=document.getElementById('na-cause').value.trim();
+  const occur=document.getElementById('na-occur').value.trim();
+  const infl=document.getElementById('na-infl').value.trim();
+  const sev=document.getElementById('na-sev').value;
+  const related=document.getElementById('na-related').value.trim();
+
+  if(!name){ showToast('알람명을 입력하세요','err'); return; }
+
+  // 코드 자동 생성 (없으면 9000번대 자동 부여)
+  let code = codeVal ? parseInt(codeVal) : null;
+  if(!code){
+    const existCodes = alarms.filter(a=>a.vision===vision&&a.type===type).map(a=>a.code);
+    code = Math.max(9000, ...existCodes.filter(c=>c>=9000)) + 1;
+  }
+
+  // 중복 확인
+  const dup = alarms.find(a=>a.vision===vision&&a.type===type&&a.code===code);
+  if(dup){ showToast(`이미 존재하는 코드입니다 (${vision} ${type} C${code})`,'err'); return; }
+
+  const newId = Math.max(...alarms.map(a=>a.id)) + 1;
+  const newAlarm = {
+    id: newId, vision, type, code,
+    name, direct_cause: cause, occurrence: occur,
+    influence: infl, related_alarms: related,
+    plc_output:'', timing:'', log:'', severity: sev,
+    isCustom: true  // 사용자 추가 알람 표시
+  };
+
+  alarms.push(newAlarm);
+  addAudit('알람 추가', ak(newAlarm), isAdmin?'Admin':'User', '', name);
+  saveAudit();
+  closeModal('add-alarm-mo');
+  applyFilters(); updateStats(); renderRight();
+  showToast(`알람 추가됨: ${vision.replace('Vision','')} ${type} C${code}`, 'ok');
+
+  // 방금 추가한 알람 바로 선택
+  setTimeout(()=>selAlarm(newId), 200);
+}
+
 function showQR(){
   const url = location.href.split('?')[0];
   document.getElementById('qr-url').textContent = url;
