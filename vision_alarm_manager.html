@@ -1118,6 +1118,8 @@ async function saveEditAction(k,idx){
   renderRight(); if(allActOpen) renderAllActions();
   showToast('수정 완료 ✅','ok');
 }
+
+async function deleteAction(k,idx){
   if(!isAdmin){ showToast('관리자 권한이 필요합니다','err'); return; }
   const ac = actions[k]?.[idx];
   if(!ac) return;
