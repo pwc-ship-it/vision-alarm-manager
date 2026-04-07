@@ -184,6 +184,10 @@ let sevFilter = '';
 let filtered = [];
 let allActOpen = false;
 let sortDescAct = 'desc';
+// 페이지네이션 상태
+const PG_THRESHOLD = 100; // 이 수 이상이면 페이지네이션 활성화
+let pgCur  = 1;           // 현재 페이지
+let pgSize = 50;          // 페이지당 표시 수
 
 // ══════════════════════════════════════
 //  HELPERS
@@ -354,6 +358,7 @@ function applyFilters(){
     return 0;
   });
 
+  pgCur = 1; // 필터 변경 시 항상 1페이지로
   renderList(q);
   document.getElementById('res-cnt').textContent = filtered.length+'개 알람';
   updateStats();
@@ -380,9 +385,14 @@ function renderList(q=''){
   const list = document.getElementById('alarm-list');
   if(!filtered.length){
     list.innerHTML='<div class="empty-s"><div class="empty-ico">🔍</div><div>검색 결과가 없습니다</div></div>';
+    renderPagination(0);
     return;
   }
-  list.innerHTML = filtered.map(a=>{
+
+  const usePg = filtered.length > PG_THRESHOLD;
+  const items  = usePg ? filtered.slice((pgCur-1)*pgSize, pgCur*pgSize) : filtered;
+
+  list.innerHTML = items.map(a=>{
     const g=ga(a), k=ak(a), isFav=favorites.includes(k);
     const acts=actions[k]||[];
     const hasActs=acts.length>0;
@@ -405,6 +415,70 @@ function renderList(q=''){
       ${hasActs?`<div class="ai-acts"><span class="hc">조치방안 ${acts.length}건</span>${sdot}</div>`:''}
     </div>`;
   }).join('');
+
+  renderPagination(filtered.length);
+}
+
+function renderPagination(total){
+  const bar = document.getElementById('pg-bar');
+  if(!bar) return;
+
+  if(total <= PG_THRESHOLD){
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = 'flex';
+  const totalPages = Math.ceil(total / pgSize);
+
+  // 페이지 정보
+  const start = (pgCur-1)*pgSize + 1;
+  const end   = Math.min(pgCur*pgSize, total);
+  document.getElementById('pg-info').textContent = `${start}-${end} / ${total}`;
+
+  // 이전/다음 버튼
+  document.getElementById('pg-prev').disabled = pgCur <= 1;
+  document.getElementById('pg-next').disabled = pgCur >= totalPages;
+
+  // 페이지 번호 버튼 (최대 5개 표시)
+  const range = 2;
+  let pages = [];
+  for(let i = Math.max(1, pgCur-range); i <= Math.min(totalPages, pgCur+range); i++) pages.push(i);
+  // 첫/끝 페이지 항상 포함
+  if(!pages.includes(1)) pages = [1, '…', ...pages];
+  if(!pages.includes(totalPages)) pages = [...pages, '…', totalPages];
+
+  document.getElementById('pg-nums').innerHTML = pages.map(p =>
+    p === '…'
+      ? `<span style="color:var(--text3);padding:0 2px;font-size:12px">…</span>`
+      : `<button class="pg-num${p===pgCur?' on':''}" onclick="goPage(${p})">${p}</button>`
+  ).join('');
+
+  // 페이지 크기 선택 동기화
+  const sel = document.getElementById('pg-size');
+  if(sel) sel.value = pgSize;
+}
+
+function changePage(dir){
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / pgSize);
+  pgCur = Math.max(1, Math.min(totalPages, pgCur + dir));
+  renderList(document.getElementById('srch').value);
+  // 목록 상단으로 스크롤
+  document.getElementById('alarm-list').scrollTop = 0;
+}
+
+function goPage(p){
+  if(typeof p !== 'number') return;
+  pgCur = p;
+  renderList(document.getElementById('srch').value);
+  document.getElementById('alarm-list').scrollTop = 0;
+}
+
+function changePageSize(val){
+  pgSize = parseInt(val);
+  pgCur  = 1;
+  renderList(document.getElementById('srch').value);
 }
 
 // ══════════════════════════════════════
@@ -413,6 +487,19 @@ function renderList(q=''){
 function selAlarm(id){
   const a=alarms.find(x=>x.id===id); if(!a) return;
   curAlarm=a;
+
+  // 페이지네이션 중일 때 해당 알람이 현재 페이지에 없으면 해당 페이지로 이동
+  if(filtered.length > PG_THRESHOLD){
+    const idx = filtered.findIndex(x=>x.id===id);
+    if(idx >= 0){
+      const targetPage = Math.floor(idx / pgSize) + 1;
+      if(targetPage !== pgCur){
+        pgCur = targetPage;
+        renderList(document.getElementById('srch').value);
+      }
+    }
+  }
+
   document.querySelectorAll('.ai').forEach(el=>el.classList.remove('cur'));
   const el=document.getElementById('ai-'+id);
   if(el){ el.classList.add('cur'); el.scrollIntoView({block:'nearest',behavior:'smooth'}); }
