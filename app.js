@@ -483,6 +483,7 @@ function renderDetail(a){
           ${g.tr_unit?`<div class="ic"><div class="icl">호기</div><div class="icv">${esc(g.tr_unit)}</div></div>`:''}
           <div class="ic"><div class="icl">조치 시간</div><div class="icv">${(g.tr_hour||0)+'시간 '+(g.tr_min||0)+'분'}</div></div>
           ${g.tr_keywords&&g.tr_keywords.length?`<div class="ic f"><div class="icl">키워드</div><div class="icv">${g.tr_keywords.map(t=>`<span style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:11px;margin-right:3px">${esc(t)}</span>`).join('')}</div></div>`:''}
+          ${g.tr_desc?`<div class="ic f"><div class="icl">발생 현상</div><div class="icv">${esc(g.tr_desc)}</div></div>`:''}
           ${g.direct_cause?`<div class="ic f"><div class="icl">원인/내용</div><div class="icv">${esc(g.direct_cause)}</div></div>`:''}
         </div>`:`
         <div class="ig" style="margin-top:9px">
@@ -1023,7 +1024,7 @@ function openAddAlarmModal(){
   document.getElementById('add-alarm-mo-title').textContent = '➕ 알람 / 트러블 추가';
   document.getElementById('na-submit-btn').textContent = '➕ 등록';
   ['na-code','na-name','na-cause','na-occur','na-infl','na-related',
-   'na-site','na-unit','na-hour','na-min','na-keywords'].forEach(id=>{
+   'na-site','na-unit','na-hour','na-min','na-keywords','na-desc'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('na-sev').value='Warning';
@@ -1058,6 +1059,7 @@ function openEditAlarmModal(id){
   document.getElementById('na-hour').value = a.tr_hour||0;
   document.getElementById('na-min').value = a.tr_min||0;
   document.getElementById('na-keywords').value = (a.tr_keywords||[]).join(', ');
+  document.getElementById('na-desc').value = a.tr_desc||'';
   document.getElementById('na-sev-t').value = a.severity||'Warning';
   renderKeywordPreview();
   onNaTypeChange();
@@ -1099,11 +1101,12 @@ async function addNewAlarm(){
     isCustom: true
   };
   if(isTrouble){
-    newAlarm.tr_site    = document.getElementById('na-site').value.trim().toUpperCase();
-    newAlarm.tr_unit    = document.getElementById('na-unit').value.trim().toUpperCase();
-    newAlarm.tr_hour    = parseInt(document.getElementById('na-hour').value)||0;
-    newAlarm.tr_min     = parseInt(document.getElementById('na-min').value)||0;
-    newAlarm.tr_keywords= document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    newAlarm.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
+    newAlarm.tr_unit     = document.getElementById('na-unit').value.trim().toUpperCase();
+    newAlarm.tr_hour     = parseInt(document.getElementById('na-hour').value)||0;
+    newAlarm.tr_min      = parseInt(document.getElementById('na-min').value)||0;
+    newAlarm.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    newAlarm.tr_desc     = document.getElementById('na-desc').value.trim();
   }
 
   customAlarms.push(newAlarm);
@@ -1132,13 +1135,14 @@ async function saveEditAlarm(id){
     a.occurrence      = document.getElementById('na-occur').value.trim();
     a.influence       = document.getElementById('na-infl').value.trim();
     a.related_alarms  = document.getElementById('na-related').value.trim();
-    delete a.tr_site; delete a.tr_unit; delete a.tr_hour; delete a.tr_min; delete a.tr_keywords;
+    delete a.tr_site; delete a.tr_unit; delete a.tr_hour; delete a.tr_min; delete a.tr_keywords; delete a.tr_desc;
   } else {
     a.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
     a.tr_unit     = document.getElementById('na-unit').value.trim().toUpperCase();
     a.tr_hour     = parseInt(document.getElementById('na-hour').value)||0;
     a.tr_min      = parseInt(document.getElementById('na-min').value)||0;
     a.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    a.tr_desc     = document.getElementById('na-desc').value.trim();
   }
 
   customAlarms[idx] = a;
