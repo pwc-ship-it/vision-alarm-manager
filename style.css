@@ -368,3 +368,22 @@ mark{background:rgba(79,124,255,.22);color:var(--accent);border-radius:2px;paddi
 .mni{font-size:17px;line-height:1}
 #mob-sheet{display:none;position:fixed;inset:50px 0 52px 0;background:var(--bg2);
   z-index:50;flex-direction:column;padding:14px;gap:10px;overflow-y:auto}
+
+/* ── PAGINATION ── */
+#pg-bar{display:flex;align-items:center;gap:8px;padding:6px 12px;
+  background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
+#pg-info{font-size:11px;color:var(--text3);min-width:80px}
+#pg-ctrl{display:flex;align-items:center;gap:3px;flex:1;justify-content:center}
+#pg-nums{display:flex;gap:3px}
+.pg-btn{background:var(--bg4);border:1px solid var(--border);border-radius:4px;
+  color:var(--text2);cursor:pointer;font-size:13px;padding:2px 8px;
+  font-family:var(--font);transition:all .15s}
+.pg-btn:hover{border-color:var(--border2);color:var(--text)}
+.pg-btn:disabled{opacity:.35;cursor:default}
+.pg-num{background:var(--bg4);border:1px solid var(--border);border-radius:4px;
+  color:var(--text2);cursor:pointer;font-size:11px;padding:2px 7px;min-width:26px;
+  text-align:center;font-family:var(--mono);transition:all .15s}
+.pg-num:hover{border-color:var(--border2);color:var(--text)}
+.pg-num.on{background:var(--accent);border-color:var(--accent);color:#fff;cursor:default}
+#pg-size{background:var(--bg4);border:1px solid var(--border);border-radius:4px;
+  color:var(--text2);font-size:11px;padding:2px 5px;font-family:var(--font);cursor:pointer}
