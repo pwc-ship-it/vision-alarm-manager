@@ -102,6 +102,20 @@
         <option value="recent-act">최신 조치방안순</option>
       </select>
     </div>
+    <!-- 페이지네이션 컨트롤 (100개 초과 시 자동 표시) -->
+    <div id="pg-bar" style="display:none">
+      <div id="pg-info"></div>
+      <div id="pg-ctrl">
+        <button class="pg-btn" id="pg-prev" onclick="changePage(-1)">‹</button>
+        <div id="pg-nums"></div>
+        <button class="pg-btn" id="pg-next" onclick="changePage(1)">›</button>
+      </div>
+      <select id="pg-size" onchange="changePageSize(this.value)" title="페이지당 표시 수">
+        <option value="20">20개</option>
+        <option value="50" selected>50개</option>
+        <option value="100">100개</option>
+      </select>
+    </div>
     <div id="alarm-list"><div class="empty-s"><div class="empty-ico">⏳</div><div>로딩 중...</div></div></div>
   </div>
 
