@@ -403,12 +403,20 @@
         </div>
 
         <!-- 키워드 -->
-        <div style="margin-bottom:4px">
+        <div style="margin-bottom:8px">
           <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">키워드 (쉼표로 구분)</label>
           <input class="fc" type="text" id="na-keywords" placeholder="예: Focus이탈, 카메라, 조명불량"
             style="margin-bottom:4px" oninput="renderKeywordPreview()">
           <div id="na-keyword-tags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"></div>
           <div style="font-size:10px;color:var(--text3)">예시: <span style="color:var(--text2)">Focus이탈, Overkill, 카메라불량, 조명이상, 트리거오류, 엔코더, 통신오류</span></div>
+        </div>
+
+        <!-- 발생 현상 -->
+        <div style="margin-bottom:4px">
+          <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">발생 현상 *</label>
+          <textarea class="fc" id="na-desc" rows="3"
+            placeholder="어떤 현상이 발생했는지 상세히 기록하세요.&#10;예) NotchingVision Focus 이탈 발생, 검사 중단됨. 카메라 렌즈 오염으로 인한 포커스 점수 저하 확인."
+            style="margin-bottom:0;resize:vertical"></textarea>
         </div>
       </div>
 
