@@ -23,7 +23,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install google-auth google-auth-httplib2
+          pip install google-auth google-auth-httplib2 requests
 
       - name: Run translation script
         env:
