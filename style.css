@@ -406,3 +406,9 @@ html[lang="en"] .icv{font-size:11px;line-height:1.5;white-space:pre-wrap}
 /* ── Translation in progress ── */
 .translating{opacity:.5;font-style:italic;color:var(--text3)}
 .translating::after{content:" (Translation in progress...)";font-size:10px;color:var(--text3)}
+
+/* ── VISION MANAGE TABS ── */
+.vm-tab{background:var(--bg4);border:1px solid var(--border);border-radius:4px;
+  color:var(--text3);cursor:pointer;font-size:11px;padding:4px 12px;font-family:var(--font)}
+.vm-tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.vm-tab:hover:not(.on){border-color:var(--border2);color:var(--text)}
