@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko" id="html-root">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>INTEKPLUS ALARM Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo"><span class="logo-dot"></span><span class="logo-intekplus">INTEK<span>PLUS</span></span><span class="logo-sep"></span><span class="logo-alarm">ALARM</span><span class="logo-manager">Manager</span></div>
+  <div id="db-status" class="loading" onclick="openFbSetup()" title="Firebase 연결 상태 · 클릭하여 설정">
+    <span class="db-dot"></span><span id="db-txt">⏳ 연결 중...</span>
+  </div>
+  <div id="tb-right">
+    <button class="btn sm" onclick="openAllActions()" data-i18n="btn_all_actions">📋 전체 조치방안</button>
+    <button class="btn sm" onclick="openAddAlarmModal()" data-i18n="btn_add_alarm">➕ 알람 추가</button>
+    <button class="btn sm" onclick="showQR()">📱 QR</button>
+    <button class="btn sm" onclick="openFbSetup()">⚙️ Firebase</button>
+    <button class="btn sm ghost" onclick="window.print()">🖨️</button>
+    <button class="lang-toggle" id="lang-btn" onclick="toggleLang()" title="언어 전환">🌐 KO</button>
+    <span class="role-badge" id="role-b" onclick="toggleAdmin()" title="클릭하여 Admin 전환">VIEWER</span>
+  </div>
+</div>
+
+<div id="main">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <!-- 통계 그리드 -->
+    <div class="sbs" style="padding:10px 13px">
+      <div class="sb-stat-grid">
+        <div class="sb-sc" onclick="document.getElementById('noact-f').checked=false;applyFilters()">
+          <div class="sb-scn" id="st-total">0</div><div class="sb-scl">전체</div>
+        </div>
+        <div class="sb-sc" onclick="document.getElementById('noact-f').checked=false;applyFilters()">
+          <div class="sb-scn grn" id="st-acts">0</div><div class="sb-scl">조치방안</div>
+        </div>
+        <div class="sb-sc" onclick="document.getElementById('noact-f').checked=true;applyFilters()" style="cursor:pointer" title="클릭 시 미등록만 필터">
+          <div class="sb-scn red" id="st-noact">0</div><div class="sb-scl">미등록</div>
+        </div>
+        <div class="sb-sc">
+          <div class="sb-scn grn" id="st-resolved">0</div><div class="sb-scl">해결됨</div>
+        </div>
+      </div>
+    </div>
+    <div class="sbs">
+      <div class="sbl" style="display:flex;align-items:center;justify-content:space-between">
+        Vision 선택
+        <button id="vision-manage-btn" onclick="openVisionManage()" style="display:none;font-size:10px;padding:2px 7px;background:var(--bg4);border:1px solid var(--border);border-radius:4px;color:var(--text3);cursor:pointer" title="Vision/타입 관리 (Admin)">⚙️ 관리</button>
+      </div>
+      <select class="fc" id="sel-v" onchange="applyFilters()">
+        <option value="">전체 Vision</option>
+        <option>NotchingVision</option><option>FoilVision</option>
+        <option>DelaminationVision</option><option>NGVision</option>
+      </select>
+      <select class="fc" id="sel-t" onchange="applyFilters()">
+        <option value="">전체 타입</option><option>HOST</option><option>Vision</option><option>Trouble</option>
+      </select>
+    </div>
+    <div class="sbs">
+      <div class="sbl">검색</div>
+      <div class="sw-wrap">
+        <input class="fc" type="text" id="srch" placeholder="코드 · 알람명 · 원인 · 조치방안" oninput="onSearch(this)">
+        <button class="sw-clear" id="srch-clr" onclick="clearSearch()">×</button>
+      </div>
+    </div>
+    <div class="sbs">
+      <div class="sbl">심각도</div>
+      <div class="pills">
+        <button class="pill on" data-sev="" onclick="setSev(this,'')">전체</button>
+        <button class="pill rc" data-sev="Critical" onclick="setSev(this,'Critical')">Critical</button>
+        <button class="pill yc" data-sev="Warning" onclick="setSev(this,'Warning')">Warning</button>
+        <button class="pill bc" data-sev="Info" onclick="setSev(this,'Info')">Info</button>
+      </div>
+    </div>
+    <div class="sbs">
+      <div class="sbl">즐겨찾기 ⭐</div>
+      <div id="fav-list" style="max-height:100px;overflow-y:auto"></div>
+    </div>
+    <div class="sbs" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="sbl">최근 조회</div>
+      <div id="recent-list" class="sb-scr" style="padding:0"></div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR RESIZER -->
+  <div class="resizer" id="rsz-sidebar" title="드래그하여 크기 조절"></div>
+
+  <!-- CENTER -->
+  <div id="center">
+    <div id="list-hdr">
+      <span id="res-cnt">로딩 중...</span>
+      <label class="noact-chk"><input type="checkbox" id="noact-f" onchange="applyFilters()"> 미등록만</label>
+      <select id="sort-sel" onchange="applyFilters()">
+        <option value="code">코드순</option>
+        <option value="name">이름순</option>
+        <option value="sev">심각도순</option>
+        <option value="acts">조치방안 많은순</option>
+        <option value="recent-act">최신 조치방안순</option>
+      </select>
+    </div>
+    <!-- 페이지네이션 컨트롤 (100개 초과 시 자동 표시) -->
+    <div id="pg-bar" style="display:none">
+      <div id="pg-info"></div>
+      <div id="pg-ctrl">
+        <button class="pg-btn" id="pg-prev" onclick="changePage(-1)">‹</button>
+        <div id="pg-nums"></div>
+        <button class="pg-btn" id="pg-next" onclick="changePage(1)">›</button>
+      </div>
+      <select id="pg-size" onchange="changePageSize(this.value)" title="페이지당 표시 수">
+        <option value="20">20개</option>
+        <option value="50" selected>50개</option>
+        <option value="100">100개</option>
+      </select>
+    </div>
+    <div id="alarm-list"><div class="empty-s"><div class="empty-ico">⏳</div><div>로딩 중...</div></div></div>
+  </div>
+
+  <!-- CENTER-DETAIL RESIZER -->
+  <div class="resizer" id="rsz-detail" title="드래그하여 크기 조절" style="display:none"></div>
+
+  <!-- DETAIL PANEL -->
+  <div id="dp"><div id="dp-content"></div></div>
+
+  <!-- ALL ACTIONS PANEL -->
+  <div id="aap">
+    <div class="aph">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:15px;font-weight:700">📋 전체 조치방안</span>
+        <span id="aap-live" class="live-dot" title="실시간 연동 중" style="display:none"></span>
+        <button class="btn sm" onclick="closeAllActions()">✕</button>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <select class="fc" id="aa-v" onchange="renderAllActions()" style="width:auto;font-size:11px;margin-bottom:0">
+          <option value="">전체 Vision</option>
+          <option>NotchingVision</option><option>FoilVision</option>
+          <option>DelaminationVision</option><option>NGVision</option>
+        </select>
+        <select class="fc" id="aa-s" onchange="renderAllActions()" style="width:auto;font-size:11px;margin-bottom:0">
+          <option value="">전체 상태</option>
+          <option value="default">📌 Default</option>
+          <option value="resolved">✅ 해결됨</option>
+          <option value="temp">⚠️ 임시조치</option>
+          <option value="checking">🔍 확인중</option>
+        </select>
+        <select class="fc" id="aa-o" onchange="renderAllActions()" style="width:auto;font-size:11px;margin-bottom:0">
+          <option value="date-desc">최신순</option>
+          <option value="date-asc">오래된순</option>
+          <option value="helpful">👍 많은순</option>
+        </select>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px" id="aa-cnt"></div>
+    </div>
+    <div class="apb" id="aap-body"></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="rp">
+    <div class="rps">
+      <div class="rpt">TOP 10 조회<div class="rt-tog">
+        <button class="rtt on" onclick="setRankP(this,'7d')">7일</button>
+        <button class="rtt" onclick="setRankP(this,'all')">전체</button>
+      </div></div>
+      <div id="rank-list"></div>
+    </div>
+    <div class="rps">
+      <div class="rpt">최근 조치방안</div>
+      <div id="recent-acts"></div>
+      <button class="btn" style="width:100%;margin-top:6px;font-size:11px" onclick="openAllActions()">전체 보기</button>
+    </div>
+    <div class="rps">
+      <div class="rpt">수정 이력<div class="rt-tog">
+        <button class="rtt" onclick="openHistModal()">전체보기</button>
+      </div></div>
+      <div id="hist-list"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MOBILE NAV -->
+<div id="mob-nav">
+  <button class="mn on" onclick="mobNav('list',this)"><span class="mni">☰</span>목록</button>
+  <button class="mn" onclick="mobNav('filter',this)"><span class="mni">⚙</span>필터</button>
+  <button class="mn" onclick="mobNav('acts',this)"><span class="mni">📋</span>조치방안</button>
+  <button class="mn" onclick="mobNav('fav',this)"><span class="mni">⭐</span>즐겨찾기</button>
+</div>
+<div id="mob-sheet"></div>
+
+<!-- FIREBASE SETUP -->
+<div id="fb-setup">
+  <div class="fbs-box">
+    <div class="fbs-title">⚡ Firebase 설정</div>
+    <div class="fbs-sub">Firebase Realtime Database를 연결하면 전 세계 어디서든 조치방안을 실시간으로 공유할 수 있습니다.<br>설정은 최초 1회만 필요합니다.</div>
+
+    <div class="step-box">
+      <div class="step-num">STEP 1 — Firebase 프로젝트 만들기</div>
+      <div class="step-txt">
+        1. <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> 접속<br>
+        2. <b>프로젝트 추가</b> 클릭 → 이름 입력 (예: vision-alarm-manager) → 만들기<br>
+        3. 구글 애널리틱스는 <b>사용 안 함</b> 선택해도 됩니다
+      </div>
+    </div>
+
+    <div class="step-box">
+      <div class="step-num">STEP 2 — Realtime Database 생성</div>
+      <div class="step-txt">
+        1. 왼쪽 메뉴 <b>빌드 → Realtime Database</b> 클릭<br>
+        2. <b>데이터베이스 만들기</b> → 위치 선택 (아시아 권장: <b>asia-southeast1</b>) → 다음<br>
+        3. 보안 규칙: <b>테스트 모드로 시작</b> 선택 → 활성화<br>
+        4. 생성된 DB URL 복사 (예: <span style="color:var(--blue)">https://프로젝트명-default-rtdb.asia-southeast1.firebasedatabase.app</span>)
+      </div>
+    </div>
+
+    <div class="step-box">
+      <div class="step-num">STEP 3 — 보안 규칙 설정 (규칙 탭에 붙여넣기)</div>
+      <div class="step-txt">Realtime Database → 규칙 탭 → 아래 내용으로 교체 후 게시:</div>
+      <div class="code-box">{
+  "rules": {
+    "actions": {
+      ".read": true,
+      ".write": true
+    },
+    "alarmEdits": {
+      ".read": true,
+      ".write": true
+    },
+    "auditLog": {
+      ".read": true,
+      ".write": true
+    },
+    "searchLog": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}</div>
+    </div>
+
+    <div class="step-box">
+      <div class="step-num">STEP 4 — Database URL 입력</div>
+      <div class="step-txt">위에서 복사한 Database URL을 아래에 입력하세요:</div>
+      <input class="fbs-inp" type="text" id="fb-url-inp"
+        placeholder="https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app">
+      <div class="fbs-note">※ 끝에 슬래시(/) 없이 입력하세요</div>
+    </div>
+
+    <div id="fb-test-result"></div>
+
+    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      <button class="btn primary" onclick="saveFbConfig()">💾 저장 및 연결</button>
+      <button class="btn" onclick="testFbConnection()">🔗 연결 테스트</button>
+      <button class="btn ghost" onclick="closeFbSetup()" style="margin-left:auto">닫기</button>
+    </div>
+    <div style="margin-top:12px;padding:10px;background:var(--bg4);border-radius:var(--r);font-size:11px;color:var(--text3);line-height:1.6">
+      💡 <b style="color:var(--text2)" data-i18n="offline_notice">오프라인 모드:</b> Firebase 미설정 또는 연결 실패 시 자동으로 로컬 저장 모드로 동작합니다. 나중에 연결하면 기존 로컬 데이터가 유지됩니다.
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY MODAL -->
+<div class="mo" id="hist-mo">
+  <div class="md" style="max-width:600px">
+    <div class="md-t">📋 전체 수정 이력</div>
+    <div style="margin-bottom:8px">
+      <select class="fc" id="hm-f" onchange="renderHistModal()" style="width:auto;font-size:11px;margin-bottom:0">
+        <option value="">전체 유형</option>
+        <option value="조치방안 등록">조치방안 등록</option>
+        <option value="알람 정보 수정">알람 수정</option>
+        <option value="Excel 업로드">업로드</option>
+      </select>
+    </div>
+    <div id="hist-mo-list" style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
+    <div class="md-a"><button class="btn" onclick="closeModal('hist-mo')">닫기</button></div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="mo" id="up-mo">
+  <div class="md">
+    <div class="md-t">📤 Excel 업로드</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
+      파일명 형식: <span style="color:var(--blue);font-family:var(--mono)">VisionName_Type_Alarm.xlsx</span>
+    </p>
+    <div class="up-area" onclick="document.getElementById('f-inp').click()">
+      <input type="file" id="f-inp" accept=".xlsx" multiple onchange="handleUpload(event)">
+      <div style="font-size:22px;margin-bottom:7px">📁</div>
+      <div>클릭하여 파일 선택</div>
+    </div>
+    <div id="up-status" style="margin-top:9px;font-size:12px;color:var(--text2)"></div>
+    <div class="md-a"><button class="btn" onclick="closeModal('up-mo')">닫기</button></div>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div class="mo" id="qr-mo">
+  <div class="md" style="max-width:360px;text-align:center">
+    <div class="md-t">📱 사이트 QR 코드</div>
+    <div id="qr-info" style="font-size:11px;margin-bottom:12px;padding:7px 10px;border-radius:var(--r);background:var(--bg3)"></div>
+    <div id="qr-canvas" style="display:flex;justify-content:center;margin-bottom:12px"></div>
+    <div id="qr-url" style="font-size:10px;color:var(--text3);word-break:break-all;margin-bottom:10px;cursor:pointer" title="클릭하여 전체 URL 보기"></div>
+    <div class="md-a">
+      <button class="btn sm" onclick="copyQrUrl()">🔗 URL 복사</button>
+      <button class="btn" onclick="closeModal('qr-mo')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD / EDIT ALARM MODAL -->
+<div class="mo" id="add-alarm-mo">
+  <div class="md" style="max-width:620px">
+    <div class="md-t" id="add-alarm-mo-title">➕ 알람 / 트러블 추가</div>
+    <input type="hidden" id="na-edit-id" value="">
+
+    <!-- Vision / 타입 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">Vision *</label>
+        <select class="fc" id="na-vision" onchange="onNaTypeChange()" style="margin-bottom:0">
+          <option value="NotchingVision">NotchingVision</option>
+          <option value="FoilVision">FoilVision</option>
+          <option value="DelaminationVision">DelaminationVision</option>
+          <option value="NGVision">NGVision</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">타입 *</label>
+        <select class="fc" id="na-type" onchange="onNaTypeChange()" style="margin-bottom:0">
+          <option value="HOST">HOST</option>
+          <option value="Vision">Vision</option>
+          <option value="Trouble">Trouble (비알람 이슈)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 코드 / 이름 -->
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">알람 코드</label>
+        <input class="fc" type="number" id="na-code" placeholder="없으면 자동부여" style="margin-bottom:0">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">알람명 / 이슈명 *</label>
+        <input class="fc" type="text" id="na-name" placeholder="예: Focus 이탈, Overkill 과다 발생" style="margin-bottom:0" maxlength="100">
+      </div>
+    </div>
+
+    <!-- 일반 필드 -->
+    <div id="na-normal-fields">
+      <div style="margin-bottom:8px">
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">직접 원인</label>
+        <textarea class="fc" id="na-cause" rows="2" placeholder="발생 원인을 입력하세요" style="margin-bottom:0;resize:vertical"></textarea>
+      </div>
+      <div style="margin-bottom:8px">
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">발생 조건</label>
+        <textarea class="fc" id="na-occur" rows="2" placeholder="어떤 상황에서 발생하는지" style="margin-bottom:0;resize:vertical"></textarea>
+      </div>
+      <div style="margin-bottom:8px">
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">영향 조건</label>
+        <textarea class="fc" id="na-infl" rows="2" placeholder="어떤 영향을 미치는지" style="margin-bottom:0;resize:vertical"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">심각도 *</label>
+          <select class="fc" id="na-sev" style="margin-bottom:0">
+            <option value="Critical">Critical</option>
+            <option value="Warning" selected>Warning</option>
+            <option value="Info">Info</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">관련 알람</label>
+          <input class="fc" type="text" id="na-related" placeholder="예: 30, 34" style="margin-bottom:0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Trouble 전용 필드 -->
+    <div id="na-trouble-fields" style="display:none">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--yellow);margin-bottom:8px;font-weight:600">⚠️ Trouble 추가 정보</div>
+
+        <!-- 사이트 / 호기 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">사이트</label>
+            <input class="fc" type="text" id="na-site" placeholder="예: LGESOC" oninput="onNaSiteInput(this)"
+              style="margin-bottom:2px;text-transform:uppercase">
+            <div id="na-site-hint" style="font-size:10px;color:var(--text3)"></div>
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">호기</label>
+            <input class="fc" type="text" id="na-unit" placeholder="예: #1, L1, LINE1" oninput="onNaUnitInput(this)"
+              style="margin-bottom:2px;text-transform:uppercase">
+            <div id="na-unit-hint" style="font-size:10px;color:var(--text3)"></div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--accent);margin-bottom:8px;padding:5px 8px;background:var(--bg2);border-radius:4px">
+          💡 <b>동일한 사이트명/호기명을 사용해야 검색이 정확합니다.</b><br>
+          입력 시 자동으로 대문자로 변환됩니다. 기존에 등록된 예시가 아래 표시됩니다.
+        </div>
+
+        <!-- 조치 시간 -->
+        <div style="margin-bottom:8px">
+          <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">조치 시간</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="fc" type="number" id="na-hour" placeholder="0" min="0" max="99"
+              style="margin-bottom:0;width:70px;text-align:center">
+            <span style="font-size:12px;color:var(--text2)">시간</span>
+            <input class="fc" type="number" id="na-min" placeholder="0" min="0" max="59"
+              style="margin-bottom:0;width:70px;text-align:center">
+            <span style="font-size:12px;color:var(--text2)">분</span>
+          </div>
+        </div>
+
+        <!-- 키워드 -->
+        <div style="margin-bottom:8px">
+          <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">키워드 (쉼표로 구분)</label>
+          <input class="fc" type="text" id="na-keywords" placeholder="예: Focus이탈, 카메라, 조명불량"
+            style="margin-bottom:4px" oninput="renderKeywordPreview()">
+          <div id="na-keyword-tags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"></div>
+          <div style="font-size:10px;color:var(--text3)">예시: <span style="color:var(--text2)">Focus이탈, Overkill, 카메라불량, 조명이상, 트리거오류, 엔코더, 통신오류</span></div>
+        </div>
+
+        <!-- 발생 현상 -->
+        <div style="margin-bottom:4px">
+          <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">발생 현상 *</label>
+          <textarea class="fc" id="na-desc" rows="3"
+            placeholder="어떤 현상이 발생했는지 상세히 기록하세요.&#10;예) NotchingVision Focus 이탈 발생, 검사 중단됨. 카메라 렌즈 오염으로 인한 포커스 점수 저하 확인."
+            style="margin-bottom:0;resize:vertical"></textarea>
+        </div>
+      </div>
+
+      <!-- Trouble도 심각도는 있음 -->
+      <div style="margin-bottom:8px">
+        <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">심각도 *</label>
+        <select class="fc" id="na-sev-t" style="margin-bottom:0;width:50%">
+          <option value="Critical">Critical</option>
+          <option value="Warning" selected>Warning</option>
+          <option value="Info">Info</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="md-a">
+      <button class="btn primary" id="na-submit-btn" onclick="submitAlarmModal()">➕ 등록</button>
+      <button class="btn" onclick="closeModal('add-alarm-mo')">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- VISION/TYPE MANAGE MODAL -->
+<div class="mo" id="vision-manage-mo">
+  <div class="md" style="max-width:500px">
+    <div class="md-t">⚙️ Vision / 타입 관리 (Admin)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div>
+        <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">Vision 목록</div>
+        <div id="vm-vision-list" style="margin-bottom:6px"></div>
+        <div style="display:flex;gap:4px">
+          <input class="fc" type="text" id="vm-vision-inp" placeholder="새 Vision명" style="margin-bottom:0;flex:1">
+          <button class="btn sm primary" onclick="addCustomVision()">추가</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">타입 목록</div>
+        <div id="vm-type-list" style="margin-bottom:6px"></div>
+        <div style="display:flex;gap:4px">
+          <input class="fc" type="text" id="vm-type-inp" placeholder="새 타입명" style="margin-bottom:0;flex:1">
+          <button class="btn sm primary" onclick="addCustomType()">추가</button>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:10px">
+      * 기본값(NotchingVision, HOST 등)은 삭제 불가. 추가된 항목만 삭제 가능합니다.
+    </div>
+    <div class="md-a"><button class="btn" onclick="closeModal('vision-manage-mo')">닫기</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="alarms.js"></script>
+<script src="alarms_en.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
