@@ -339,7 +339,13 @@ function applyFilters(){
     const k=ak(a); const acts=actions[k]||[];
     if(noActOnly&&acts.length>0) return false;
     if(q){
-      const hay=[String(g.code),g.name,g.direct_cause,g.occurrence,g.influence,g.related_alarms,g.log].join(' ').toLowerCase();
+      const hay=[
+        String(g.code), g.name, g.direct_cause, g.occurrence,
+        g.influence, g.related_alarms, g.log,
+        // Trouble 전용 필드
+        g.tr_site||'', g.tr_unit||'', g.tr_desc||'',
+        (g.tr_keywords||[]).join(' ')
+      ].join(' ').toLowerCase();
       const atxt=acts.map(x=>(x.text||'')+' '+(x.author||'')).join(' ').toLowerCase();
       if(!hay.includes(q)&&!atxt.includes(q)) return false;
     }
@@ -411,7 +417,11 @@ function renderList(q=''){
         <button class="star-b ${isFav?'on':''}" onclick="event.stopPropagation();toggleFav('${k}')" title="${isFav?'즐겨찾기 해제':'즐겨찾기'}">★</button>
       </div>
       <div class="ai-name">${hl(g.name,q)}</div>
-      <div class="ai-cause">${hl((g.direct_cause||'').split('\n')[0],q)}</div>
+      <div class="ai-cause">${
+        g.type==='Trouble'
+          ? hl([g.tr_site, g.tr_unit, (g.tr_keywords||[]).join(' · ')].filter(Boolean).join(' / ') || (g.tr_desc||'').split('\n')[0], q)
+          : hl((g.direct_cause||'').split('\n')[0], q)
+      }</div>
       ${hasActs?`<div class="ai-acts"><span class="hc">조치방안 ${acts.length}건</span>${sdot}</div>`:''}
     </div>`;
   }).join('');
