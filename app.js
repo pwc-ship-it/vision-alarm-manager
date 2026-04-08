@@ -56,12 +56,13 @@ function startPolling(){
   pollTimer = setInterval(async ()=>{
     if(!FB_URL || !fbOnline) return;
     try{
-      const [actData, auditData, caData, cvData, ctData] = await Promise.all([
+      const [actData, auditData, caData, cvData, ctData, suData] = await Promise.all([
         fbGet('actions'),
         fbGet('auditLog'),
         fbGet('customAlarms'),
         fbGet('customVisions'),
-        fbGet('customTypes')
+        fbGet('customTypes'),
+        fbGet('siteUnits')
       ]);
       let changed = false;
       const newActions = (actData && typeof actData === 'object') ? actData : {};
@@ -82,6 +83,9 @@ function startPolling(){
       }
       if(ctData && Array.isArray(ctData) && JSON.stringify(ctData)!==JSON.stringify(customTypes)){
         customTypes = ctData; sS('vam_custom_types', customTypes); renderVisionSelects(); changed = true;
+      }
+      if(suData && Array.isArray(suData) && JSON.stringify(suData)!==JSON.stringify(siteUnits)){
+        siteUnits = suData; sS('vam_site_units', siteUnits); changed = true;
       }
       if(changed){
         renderRight();
@@ -112,13 +116,14 @@ async function initFirebase(){
     setDbStatus('online');
     console.log('[Firebase] 연결 성공! 데이터 로드 중...');
 
-    const [actData, editData, auditData, caData, cvData, ctData] = await Promise.all([
+    const [actData, editData, auditData, caData, cvData, ctData, suData] = await Promise.all([
       fbGet('actions'),
       fbGet('alarmEdits'),
       fbGet('auditLog'),
       fbGet('customAlarms'),
       fbGet('customVisions'),
-      fbGet('customTypes')
+      fbGet('customTypes'),
+      fbGet('siteUnits')
     ]);
 
     if(actData && typeof actData === 'object') actions = actData;
@@ -127,6 +132,7 @@ async function initFirebase(){
     if(caData && Array.isArray(caData)){ customAlarms = caData; sS('vam_custom_alarms', customAlarms); }
     if(cvData && Array.isArray(cvData)){ customVisions = cvData; sS('vam_custom_visions', customVisions); }
     if(ctData && Array.isArray(ctData)){ customTypes = ctData; sS('vam_custom_types', customTypes); }
+    if(suData && Array.isArray(suData)){ siteUnits = suData; sS('vam_site_units', siteUnits); }
 
     // alarms 재구성 (RAW + customAlarms)
     rebuildAlarms();
@@ -407,6 +413,28 @@ function applyLang(){
 let customAlarms  = gS('vam_custom_alarms', []);
 let customVisions = gS('vam_custom_visions', []);
 let customTypes   = gS('vam_custom_types', []);
+
+// 사이트/호기 데이터 (CSV 초기값 포함)
+const DEFAULT_SITE_UNITS = [
+  {"site":"ESHD","units":["1-1A","1-2A","2-1A","2-2A","1-1C","1-2C","2-1C","2-2C","3-1A","3-2A","4-1A","4-2A","5-1C","5-2C","6-1C","6-2C"]},
+  {"site":"ESHG","units":["1A-A","1A-C","1B-A","1B-C","1C-A","1C-C","1D-A","1D-C","2A-A","2A-C","2B-A","2B-C","2C-A","2C-C","2D-A","2D-C"]},
+  {"site":"ESMI","units":["1-1C","1-2C","2-1C","2-2C","3-1C","3-2C","3-3C","4-1C","4-2C","4-3C","5-1C","5-2C","1-1A","1-2A","2-1A","2-2A","3-1A","3-2A","3-3A","4-1A","4-2A","4-3A","5-1A","5-2A"]},
+  {"site":"ESMIL","units":["1A","2A","3A","4A","5A","6A","7A"]},
+  {"site":"ESNA","units":["1-1C","2-1C","2-2C","3-1C","3-2C","4-1C","4-2C","5-1C","5-2C","6-1C","6-2C","6-3C","7-1C","7-2C","7-3C","1-1A","2-1A","2-2A","3-1A","3-2A","4-1A","4-2A","5-1A","5-2A","6-1A","6-2A","6-3A","7-1A","7-2A","7-3A"]},
+  {"site":"ESNB","units":["ESS2-1C","ESS2-2C","2-1C","2-2C","2-3C","3-1C","3-2C","4-1C","4-2C","ESS1-1C","ESS1-2C","6-1C","6-2C","10-1C","11-1C","12-1C","13-1C","14-1C","14-2C","ESS2-1A","ESS2-2A","2-1A","2-2A","ESS2-3A","3-1A","3-2A","4-1A","4-2A","5-1A","5-2A","ESS1-1A","ESS1-2A","6-1A","6-3A","7-1A","7-2A","10-1A","11-1A","12-1A","13-1A","14-1A","14-2A"]},
+  {"site":"ESOT","units":["1-1A","1-2A","2-1A","2-2A","3-1A","3-2A","4-1A","4-2A","1-1C","1-2C","2-1C","2-2C","3-1C","3-2C","4-1C","4-2C"]},
+  {"site":"ESUC2","units":["1A","2A","3A","4A","5A","6A","7A"]},
+  {"site":"ESWA","units":["1-1C","1-2C","2-1C","2-2C","3-1C","3-2C","3-3C","3-4C","1-1A","1-2A","2-1A","2-2A","3-1A","3-2A","3-3A","3-4A","4-1C","5-1C","6-1C","6-2C","7-1C","7-2C","25-1C","25-2C","4-1A","5-1A","6-1A","6-2A","7-1A","7-2A","25-1A","25-2A","8-1C","8-2C","9-1C","9-2C","10-1C","11-1C","11-2C","12-1C","12-2C","13-1C","14-1C","15-1C","15-2C","16-1C","16-2C","17-1C","17-2C","18-1C","18-2C","19-1C","19-2C","20-1C","21-1C","22-1C","23-1C","24-1C","8-1A","8-2A","9-1A","9-2A","10-1A","11-1A","11-2A","12-1A","12-2A","13-1A","14-1A","15-1A","15-2A","16-1A","16-2A","17-1A","17-2A","18-1A","18-2A","19-1A","19-2A","20-1A","21-1A","22-1A","23-1A","24-1A","26-1C","26-2C","27-1C","27-2C","28-1C","28-2C","26-1A","26-2A","27-1A","27-2A","28-1A","28-2A","29-1A","29-1C"]}
+];
+let siteUnits = gS('vam_site_units', null);
+// 최초 실행 시 또는 데이터 없을 때 기본값 사용
+if(!siteUnits || !Array.isArray(siteUnits) || siteUnits.length === 0){
+  siteUnits = DEFAULT_SITE_UNITS;
+  sS('vam_site_units', siteUnits);
+}
+
+// 사이트명 정규화: LGESWA → ESWA, ESWA → ESWA
+function normalizeSite(s){ return (s||'').replace(/^LGES/, 'ES').toUpperCase(); }
 let alarms = [...RAW.map(a=>({...a})), ...customAlarms.map(a=>({...a}))];
 let actions    = gS('vam_actions', {});
 let favorites  = gS('vam_favorites', []);
@@ -557,6 +585,11 @@ async function saveCustomVisions(){
 async function saveCustomTypes(){
   sS('vam_custom_types', customTypes);
   if(fbOnline) await fbPatch('customTypes', customTypes.length ? customTypes : null);
+}
+
+async function saveSiteUnits(){
+  sS('vam_site_units', siteUnits);
+  if(fbOnline) await fbPatch('siteUnits', siteUnits.length ? siteUnits : null);
 }
 async function saveAlarmEdits(){
   sS('vam_alarm_edits', alarmEdits);
@@ -1375,27 +1408,40 @@ function onNaTypeChange(){
   document.getElementById('na-trouble-fields').style.display = isTrouble ? '' : 'none';
 }
 
-function onNaSiteInput(el){
-  el.value = el.value.toUpperCase();
-  const site = el.value.trim();
-  const hint = document.getElementById('na-site-hint');
-  if(!site){ hint.textContent=''; return; }
-  const sites = [...new Set(customAlarms.filter(a=>a.tr_site).map(a=>a.tr_site))];
-  const matches = sites.filter(s=>s.startsWith(site) && s!==site);
-  hint.textContent = matches.length ? '기존: '+matches.slice(0,3).join(', ') : '';
-  // 사이트 입력 시 해당 사이트의 호기 힌트도 업데이트
-  onNaUnitInput(document.getElementById('na-unit'));
+// 사이트 드롭다운 렌더링
+function renderSiteSelect(selId='na-site', selectedSite=''){
+  const el = document.getElementById(selId);
+  if(!el) return;
+  el.innerHTML = `<option value="">-- 선택 --</option>`
+    + siteUnits.map(su=>`<option value="${su.site}"${su.site===selectedSite?' selected':''}>${su.site} (${su.units.length}개)</option>`).join('');
 }
 
-function onNaUnitInput(el){
-  el.value = el.value.toUpperCase();
-  const site = document.getElementById('na-site').value.trim();
-  const unit = el.value.trim();
-  const hint = document.getElementById('na-unit-hint');
-  if(!site){ hint.textContent='사이트를 먼저 입력하세요'; return; }
-  const units = [...new Set(customAlarms.filter(a=>a.tr_site===site&&a.tr_unit).map(a=>a.tr_unit))];
-  hint.textContent = units.length ? '기존 호기: '+units.slice(0,4).join(', ') : (unit?'':'이 사이트의 첫 등록');
+// 호기 드롭다운 렌더링 (사이트 선택 후)
+function renderUnitSelect(site, selId='na-unit', selectedUnit=''){
+  const el = document.getElementById(selId);
+  if(!el) return;
+  const su = siteUnits.find(x=>x.site===site);
+  if(!su || !su.units.length){
+    el.innerHTML = `<option value="">-- 호기 없음 --</option>`;
+    return;
+  }
+  el.innerHTML = `<option value="">-- 선택 --</option>`
+    + su.units.map(u=>`<option value="${u}"${u===selectedUnit?' selected':''}>${u}</option>`).join('');
 }
+
+function onNaSiteChange(){
+  const site = document.getElementById('na-site').value;
+  renderUnitSelect(site);
+  const hint = document.getElementById('na-site-hint');
+  if(hint){
+    const su = siteUnits.find(x=>x.site===site);
+    hint.textContent = su ? `호기 ${su.units.length}개` : '';
+  }
+}
+
+// 기존 자유입력 핸들러 (호환성 유지 - 더 이상 사용 안 함)
+function onNaSiteInput(el){ el.value = el.value.toUpperCase(); }
+function onNaUnitInput(el){ el.value = el.value.toUpperCase(); }
 
 function renderKeywordPreview(){
   const val = document.getElementById('na-keywords').value;
@@ -1419,6 +1465,8 @@ function openAddAlarmModal(){
   document.getElementById('na-keyword-tags').innerHTML='';
   document.getElementById('na-site-hint').textContent='';
   document.getElementById('na-unit-hint').textContent='';
+  renderSiteSelect();  // 사이트 드롭다운 초기화
+  renderUnitSelect(''); // 호기 드롭다운 초기화
   renderVisionSelects();
   onNaTypeChange();
   document.getElementById('add-alarm-mo').classList.add('open');
@@ -1441,8 +1489,15 @@ function openEditAlarmModal(id){
   document.getElementById('na-sev').value = a.severity||'Warning';
   document.getElementById('na-related').value = a.related_alarms||'';
   // Trouble 필드
-  document.getElementById('na-site').value = a.tr_site||'';
-  document.getElementById('na-unit').value = a.tr_unit||'';
+  const editSite = a.tr_site||'';
+  const editUnit = a.tr_unit||'';
+  renderSiteSelect('na-site', editSite);
+  renderUnitSelect(editSite, 'na-unit', editUnit);
+  if(editSite){
+    const hint = document.getElementById('na-site-hint');
+    const su = siteUnits.find(x=>x.site===editSite);
+    if(hint && su) hint.textContent = `호기 ${su.units.length}개`;
+  }
   document.getElementById('na-hour').value = a.tr_hour||0;
   document.getElementById('na-min').value = a.tr_min||0;
   document.getElementById('na-keywords').value = (a.tr_keywords||[]).join(', ');
@@ -1562,72 +1617,139 @@ async function deleteCustomAlarm(id){
 }
 
 // ══════════════════════════════════════
-//  VISION / TYPE MANAGE (Admin)
+//  VISION / TYPE / SITE MANAGE (Admin)
 // ══════════════════════════════════════
+let vmCurrentSite = '';
+
 function openVisionManage(){
   if(!isAdmin){ showToast('Admin 권한이 필요합니다','err'); return; }
-  renderVisionManageModal();
+  switchVmTab('vision');
   document.getElementById('vision-manage-mo').classList.add('open');
 }
 
-function renderVisionManageModal(){
-  const baseVisions = ['NotchingVision','FoilVision','DelaminationVision','NGVision'];
-  const baseTypes   = ['HOST','Vision','Trouble'];
+function switchVmTab(tab){
+  ['vision','type','site'].forEach(t=>{
+    document.getElementById(`vm-tab-${t}`)?.classList.toggle('on', t===tab);
+    const pane=document.getElementById(`vm-pane-${t}`);
+    if(pane) pane.style.display = t===tab?'':'none';
+  });
+  if(tab==='vision') renderVisionManageModal();
+  if(tab==='type')   renderTypeManageModal();
+  if(tab==='site')   renderSiteManageModal();
+}
 
-  document.getElementById('vm-vision-list').innerHTML = [
-    ...baseVisions.map(v=>`<div class="vm-item"><span>${v}</span><span style="font-size:10px;color:var(--text3)">기본</span></div>`),
+function renderVisionManageModal(){
+  const base=['NotchingVision','FoilVision','DelaminationVision','NGVision'];
+  document.getElementById('vm-vision-list').innerHTML=[
+    ...base.map(v=>`<div class="vm-item"><span>${v}</span><span style="font-size:10px;color:var(--text3)">기본</span></div>`),
     ...customVisions.map((v,i)=>`<div class="vm-item"><span>${v}</span><button onclick="deleteCustomVision(${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`)
   ].join('');
+}
 
-  document.getElementById('vm-type-list').innerHTML = [
-    ...baseTypes.map(t=>`<div class="vm-item"><span>${t}</span><span style="font-size:10px;color:var(--text3)">기본</span></div>`),
+function renderTypeManageModal(){
+  const base=['HOST','Vision','Trouble'];
+  document.getElementById('vm-type-list').innerHTML=[
+    ...base.map(t=>`<div class="vm-item"><span>${t}</span><span style="font-size:10px;color:var(--text3)">기본</span></div>`),
     ...customTypes.map((t,i)=>`<div class="vm-item"><span>${t}</span><button onclick="deleteCustomType(${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`)
   ].join('');
 }
 
+function renderSiteManageModal(){
+  document.getElementById('vm-site-list').innerHTML=siteUnits.map((su,i)=>
+    `<div class="vm-item ${su.site===vmCurrentSite?'on':''}" style="${su.site===vmCurrentSite?'border-color:var(--accent);background:var(--bg4)':''}" onclick="selectVmSite('${su.site}')">
+      <span style="cursor:pointer;flex:1">${su.site}</span>
+      <span style="font-size:10px;color:var(--text3)">${su.units.length}개</span>
+      <button onclick="event.stopPropagation();deleteSite(${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-left:4px">🗑️</button>
+    </div>`
+  ).join('')||`<div style="font-size:11px;color:var(--text3)">사이트 없음</div>`;
+
+  const suSel=siteUnits.find(x=>x.site===vmCurrentSite);
+  document.getElementById('vm-selected-site').textContent=vmCurrentSite?`— ${vmCurrentSite}`:'';
+  document.getElementById('vm-unit-add-row').style.display=vmCurrentSite?'flex':'none';
+  document.getElementById('vm-unit-list').innerHTML=vmCurrentSite
+    ? (suSel?.units.map((u,i)=>
+        `<div class="vm-item"><span>${u}</span><button onclick="deleteUnit('${vmCurrentSite}',${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`
+      ).join('')||`<div style="font-size:11px;color:var(--text3)">호기 없음</div>`)
+    : `<div style="font-size:11px;color:var(--text3)">← 사이트를 선택하세요</div>`;
+}
+
+function selectVmSite(site){ vmCurrentSite=site; renderSiteManageModal(); }
+
 async function addCustomVision(){
-  const v = document.getElementById('vm-vision-inp').value.trim();
+  const v=document.getElementById('vm-vision-inp').value.trim();
   if(!v){ showToast('Vision명을 입력하세요','err'); return; }
-  const baseVisions = ['NotchingVision','FoilVision','DelaminationVision','NGVision'];
-  if([...baseVisions,...customVisions].includes(v)){ showToast('이미 존재합니다','err'); return; }
+  const base=['NotchingVision','FoilVision','DelaminationVision','NGVision'];
+  if([...base,...customVisions].includes(v)){ showToast('이미 존재합니다','err'); return; }
   customVisions.push(v);
   document.getElementById('vm-vision-inp').value='';
-  await saveCustomVisions();
-  renderVisionSelects();
-  renderVisionManageModal();
+  await saveCustomVisions(); renderVisionSelects(); renderVisionManageModal();
   showToast(`Vision 추가됨: ${v}`,'ok');
 }
-
 async function deleteCustomVision(i){
-  if(!confirm(`"${customVisions[i]}" Vision을 삭제하시겠습니까?`)){ return; }
+  if(!confirm(`"${customVisions[i]}" Vision을 삭제하시겠습니까?`)) return;
   customVisions.splice(i,1);
-  await saveCustomVisions();
-  renderVisionSelects();
-  renderVisionManageModal();
+  await saveCustomVisions(); renderVisionSelects(); renderVisionManageModal();
   showToast('Vision 삭제됨','ok');
 }
-
 async function addCustomType(){
-  const t = document.getElementById('vm-type-inp').value.trim();
+  const t=document.getElementById('vm-type-inp').value.trim();
   if(!t){ showToast('타입명을 입력하세요','err'); return; }
-  const baseTypes = ['HOST','Vision','Trouble'];
-  if([...baseTypes,...customTypes].includes(t)){ showToast('이미 존재합니다','err'); return; }
+  const base=['HOST','Vision','Trouble'];
+  if([...base,...customTypes].includes(t)){ showToast('이미 존재합니다','err'); return; }
   customTypes.push(t);
   document.getElementById('vm-type-inp').value='';
-  await saveCustomTypes();
-  renderVisionSelects();
-  renderVisionManageModal();
+  await saveCustomTypes(); renderVisionSelects(); renderTypeManageModal();
   showToast(`타입 추가됨: ${t}`,'ok');
 }
-
 async function deleteCustomType(i){
-  if(!confirm(`"${customTypes[i]}" 타입을 삭제하시겠습니까?`)){ return; }
+  if(!confirm(`"${customTypes[i]}" 타입을 삭제하시겠습니까?`)) return;
   customTypes.splice(i,1);
-  await saveCustomTypes();
-  renderVisionSelects();
-  renderVisionManageModal();
+  await saveCustomTypes(); renderVisionSelects(); renderTypeManageModal();
   showToast('타입 삭제됨','ok');
 }
+
+// ── 사이트 추가/삭제 ──
+async function addSite(){
+  const v=document.getElementById('vm-site-inp').value.trim().toUpperCase();
+  if(!v){ showToast('사이트명을 입력하세요','err'); return; }
+  if(siteUnits.find(x=>x.site===v)){ showToast('이미 존재합니다','err'); return; }
+  siteUnits.push({site:v,units:[]}); vmCurrentSite=v;
+  document.getElementById('vm-site-inp').value='';
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`사이트 추가됨: ${v}`,'ok');
+}
+async function deleteSite(i){
+  const s=siteUnits[i]; if(!s) return;
+  if(!confirm(`"${s.site}" 사이트와 호기 ${s.units.length}개를 삭제하시겠습니까?`)) return;
+  if(vmCurrentSite===s.site) vmCurrentSite='';
+  siteUnits.splice(i,1);
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`사이트 삭제됨: ${s.site}`,'ok');
+}
+
+// ── 호기 추가/삭제 ──
+async function addUnit(){
+  if(!vmCurrentSite){ showToast('사이트를 먼저 선택하세요','err'); return; }
+  const raw=document.getElementById('vm-unit-inp').value.trim();
+  if(!raw){ showToast('호기명을 입력하세요','err'); return; }
+  const su=siteUnits.find(x=>x.site===vmCurrentSite); if(!su) return;
+  const added=raw.split(',').map(u=>u.trim()).filter(u=>u&&!su.units.includes(u));
+  if(!added.length){ showToast('이미 존재하거나 빈 값입니다','err'); return; }
+  su.units.push(...added);
+  document.getElementById('vm-unit-inp').value='';
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`호기 추가됨: ${added.join(', ')}`,'ok');
+}
+async function deleteUnit(site,i){
+  const su=siteUnits.find(x=>x.site===site); if(!su) return;
+  const u=su.units[i];
+  if(!confirm(`"${site} - ${u}" 호기를 삭제하시겠습니까?`)) return;
+  su.units.splice(i,1);
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`호기 삭제됨: ${u}`,'ok');
+}
+
+
 
 function showQR(){
   const base = location.href.split('?')[0];
