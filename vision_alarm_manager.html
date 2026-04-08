@@ -49,7 +49,7 @@
     </div>
     <div class="sbs">
       <div class="sbl" style="display:flex;align-items:center;justify-content:space-between">
-        Vision 선택
+        <span data-i18n="vision_select">Vision 선택</span>
         <button id="vision-manage-btn" onclick="openVisionManage()" style="display:none;font-size:10px;padding:2px 7px;background:var(--bg4);border:1px solid var(--border);border-radius:4px;color:var(--text3);cursor:pointer" title="Vision/타입 관리 (Admin)">⚙️ 관리</button>
       </div>
       <select class="fc" id="sel-v" onchange="applyFilters()">
@@ -62,27 +62,27 @@
       </select>
     </div>
     <div class="sbs">
-      <div class="sbl">검색</div>
+      <div class="sbl" data-i18n="search_label">검색</div>
       <div class="sw-wrap">
         <input class="fc" type="text" id="srch" placeholder="코드 · 알람명 · 원인 · 조치방안" oninput="onSearch(this)">
         <button class="sw-clear" id="srch-clr" onclick="clearSearch()">×</button>
       </div>
     </div>
     <div class="sbs">
-      <div class="sbl">심각도</div>
+      <div class="sbl" data-i18n="severity">심각도</div>
       <div class="pills">
-        <button class="pill on" data-sev="" onclick="setSev(this,'')">전체</button>
+        <button class="pill on" data-sev="" onclick="setSev(this,'')" data-i18n="stat_total">전체</button>
         <button class="pill rc" data-sev="Critical" onclick="setSev(this,'Critical')">Critical</button>
         <button class="pill yc" data-sev="Warning" onclick="setSev(this,'Warning')">Warning</button>
         <button class="pill bc" data-sev="Info" onclick="setSev(this,'Info')">Info</button>
       </div>
     </div>
     <div class="sbs">
-      <div class="sbl">즐겨찾기 ⭐</div>
+      <div class="sbl" data-i18n="favorites">즐겨찾기 ⭐</div>
       <div id="fav-list" style="max-height:100px;overflow-y:auto"></div>
     </div>
     <div class="sbs" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-      <div class="sbl">최근 조회</div>
+      <div class="sbl" data-i18n="recent">최근 조회</div>
       <div id="recent-list" class="sb-scr" style="padding:0"></div>
     </div>
   </div>
@@ -94,7 +94,7 @@
   <div id="center">
     <div id="list-hdr">
       <span id="res-cnt">로딩 중...</span>
-      <label class="noact-chk"><input type="checkbox" id="noact-f" onchange="applyFilters()"> 미등록만</label>
+      <label class="noact-chk"><input type="checkbox" id="noact-f" onchange="applyFilters()"> <span data-i18n="no_act_only">미등록만</span></label>
       <select id="sort-sel" onchange="applyFilters()">
         <option value="code">코드순</option>
         <option value="name">이름순</option>
@@ -388,20 +388,21 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <div>
             <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">사이트</label>
-            <input class="fc" type="text" id="na-site" placeholder="예: LGESOC" oninput="onNaSiteInput(this)"
-              style="margin-bottom:2px;text-transform:uppercase">
+            <select class="fc" id="na-site" onchange="onNaSiteChange()" style="margin-bottom:2px">
+              <option value="">-- 선택 --</option>
+            </select>
             <div id="na-site-hint" style="font-size:10px;color:var(--text3)"></div>
           </div>
           <div>
             <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">호기</label>
-            <input class="fc" type="text" id="na-unit" placeholder="예: #1, L1, LINE1" oninput="onNaUnitInput(this)"
-              style="margin-bottom:2px;text-transform:uppercase">
+            <select class="fc" id="na-unit" style="margin-bottom:2px">
+              <option value="">-- 사이트 먼저 선택 --</option>
+            </select>
             <div id="na-unit-hint" style="font-size:10px;color:var(--text3)"></div>
           </div>
         </div>
         <div style="font-size:10px;color:var(--accent);margin-bottom:8px;padding:5px 8px;background:var(--bg2);border-radius:4px">
-          💡 <b>동일한 사이트명/호기명을 사용해야 검색이 정확합니다.</b><br>
-          입력 시 자동으로 대문자로 변환됩니다. 기존에 등록된 예시가 아래 표시됩니다.
+          💡 목록에 없는 사이트/호기는 Admin에서 추가할 수 있습니다.
         </div>
 
         <!-- 조치 시간 -->
@@ -455,28 +456,65 @@
 
 <!-- VISION/TYPE MANAGE MODAL -->
 <div class="mo" id="vision-manage-mo">
-  <div class="md" style="max-width:500px">
-    <div class="md-t">⚙️ Vision / 타입 관리 (Admin)</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div>
-        <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">Vision 목록</div>
-        <div id="vm-vision-list" style="margin-bottom:6px"></div>
-        <div style="display:flex;gap:4px">
-          <input class="fc" type="text" id="vm-vision-inp" placeholder="새 Vision명" style="margin-bottom:0;flex:1">
-          <button class="btn sm primary" onclick="addCustomVision()">추가</button>
-        </div>
+  <div class="md" style="max-width:600px">
+    <div class="md-t">⚙️ Vision / 타입 / 사이트 관리 (Admin)</div>
+    <!-- 탭 -->
+    <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px">
+      <button class="vm-tab on" id="vm-tab-vision" onclick="switchVmTab('vision')">Vision</button>
+      <button class="vm-tab" id="vm-tab-type" onclick="switchVmTab('type')">타입</button>
+      <button class="vm-tab" id="vm-tab-site" onclick="switchVmTab('site')">사이트/호기</button>
+    </div>
+
+    <!-- Vision 탭 -->
+    <div id="vm-pane-vision">
+      <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">Vision 목록</div>
+      <div id="vm-vision-list" style="margin-bottom:6px"></div>
+      <div style="display:flex;gap:4px">
+        <input class="fc" type="text" id="vm-vision-inp" placeholder="새 Vision명" style="margin-bottom:0;flex:1">
+        <button class="btn sm primary" onclick="addCustomVision()">추가</button>
       </div>
-      <div>
-        <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">타입 목록</div>
-        <div id="vm-type-list" style="margin-bottom:6px"></div>
-        <div style="display:flex;gap:4px">
-          <input class="fc" type="text" id="vm-type-inp" placeholder="새 타입명" style="margin-bottom:0;flex:1">
-          <button class="btn sm primary" onclick="addCustomType()">추가</button>
+    </div>
+
+    <!-- 타입 탭 -->
+    <div id="vm-pane-type" style="display:none">
+      <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">타입 목록</div>
+      <div id="vm-type-list" style="margin-bottom:6px"></div>
+      <div style="display:flex;gap:4px">
+        <input class="fc" type="text" id="vm-type-inp" placeholder="새 타입명" style="margin-bottom:0;flex:1">
+        <button class="btn sm primary" onclick="addCustomType()">추가</button>
+      </div>
+    </div>
+
+    <!-- 사이트/호기 탭 -->
+    <div id="vm-pane-site" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:12px">
+        <!-- 사이트 목록 -->
+        <div>
+          <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">사이트</div>
+          <div id="vm-site-list" style="max-height:250px;overflow-y:auto;margin-bottom:6px"></div>
+          <div style="display:flex;gap:4px">
+            <input class="fc" type="text" id="vm-site-inp" placeholder="새 사이트명" style="margin-bottom:0;flex:1;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+            <button class="btn sm primary" onclick="addSite()">추가</button>
+          </div>
+        </div>
+        <!-- 호기 목록 -->
+        <div>
+          <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">
+            호기 <span id="vm-selected-site" style="color:var(--accent)"></span>
+          </div>
+          <div id="vm-unit-list" style="max-height:250px;overflow-y:auto;margin-bottom:6px">
+            <div style="font-size:11px;color:var(--text3)">← 사이트를 선택하세요</div>
+          </div>
+          <div style="display:flex;gap:4px" id="vm-unit-add-row" style="display:none">
+            <input class="fc" type="text" id="vm-unit-inp" placeholder="호기명 (여러개: 쉼표 구분)" style="margin-bottom:0;flex:1">
+            <button class="btn sm primary" onclick="addUnit()">추가</button>
+          </div>
         </div>
       </div>
     </div>
-    <div style="font-size:10px;color:var(--text3);margin-bottom:10px">
-      * 기본값(NotchingVision, HOST 등)은 삭제 불가. 추가된 항목만 삭제 가능합니다.
+
+    <div style="font-size:10px;color:var(--text3);margin-top:10px">
+      * 기본 Vision/타입은 삭제 불가. 사이트/호기는 모두 수정 가능합니다.
     </div>
     <div class="md-a"><button class="btn" onclick="closeModal('vision-manage-mo')">닫기</button></div>
   </div>
