@@ -254,8 +254,14 @@ function renderVisionSelects(){
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function hl(s,q){
   if(!q) return esc(s);
-  const re = new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
-  return esc(s).replace(re,'<mark>$1</mark>');
+  // 다중 키워드 각각 하이라이트
+  const terms = q.trim().replace(/\s+/g,' ').split(' ').filter(Boolean);
+  let result = esc(s);
+  terms.forEach(term => {
+    const re = new RegExp('('+term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    result = result.replace(re,'<mark>$1</mark>');
+  });
+  return result;
 }
 const SLBL = {resolved:'✅ 해결됨', temp:'⚠️ 임시조치', checking:'🔍 확인중', default:'📌 Default'};
 const SCLS = {resolved:'sp resolved', temp:'sp temp', checking:'sp checking', default:'sp default', '':'sp none'};
@@ -327,7 +333,10 @@ function updateStats(){
 function applyFilters(){
   const v=document.getElementById('sel-v').value;
   const t=document.getElementById('sel-t').value;
-  const q=(document.getElementById('srch').value||'').trim().toLowerCase();
+  // 검색어 정규화: 앞뒤 공백 제거 + 중간 공백 정규화 + 소문자
+  const raw = (document.getElementById('srch').value||'').trim().replace(/\s+/g,' ').toLowerCase();
+  // 다중 키워드 AND 검색: 공백으로 분리
+  const qTerms = raw ? raw.split(' ').filter(Boolean) : [];
   const sort=document.getElementById('sort-sel').value;
   const noActOnly=document.getElementById('noact-f').checked;
 
@@ -338,16 +347,17 @@ function applyFilters(){
     if(sevFilter&&g.severity!==sevFilter) return false;
     const k=ak(a); const acts=actions[k]||[];
     if(noActOnly&&acts.length>0) return false;
-    if(q){
+    if(qTerms.length){
       const hay=[
         String(g.code), g.name, g.direct_cause, g.occurrence,
         g.influence, g.related_alarms, g.log,
-        // Trouble 전용 필드
         g.tr_site||'', g.tr_unit||'', g.tr_desc||'',
         (g.tr_keywords||[]).join(' ')
       ].join(' ').toLowerCase();
       const atxt=acts.map(x=>(x.text||'')+' '+(x.author||'')).join(' ').toLowerCase();
-      if(!hay.includes(q)&&!atxt.includes(q)) return false;
+      const combined = hay + ' ' + atxt;
+      // 모든 키워드가 포함되어야 함 (AND 검색)
+      if(!qTerms.every(term => combined.includes(term))) return false;
     }
     return true;
   });
@@ -365,7 +375,7 @@ function applyFilters(){
   });
 
   pgCur = 1; // 필터 변경 시 항상 1페이지로
-  renderList(q);
+  renderList(raw);
   document.getElementById('res-cnt').textContent = filtered.length+'개 알람';
   updateStats();
   if(q.length>1||v||t||sevFilter) logSearch((v||'ALL')+'_'+(t||'ALL')+'_'+q);
