@@ -563,9 +563,10 @@ function applyFilters(){
 
   pgCur = 1; // 필터 변경 시 항상 1페이지로
   renderList(raw);
-  document.getElementById('res-cnt').textContent = filtered.length + t('alarm_count');
+  const alarmWord = (typeof t === 'function') ? t('alarm_count') : '개 알람';
+  document.getElementById('res-cnt').textContent = filtered.length + alarmWord;
   updateStats();
-  if(q.length>1||v||t||sevFilter) logSearch((v||'ALL')+'_'+(t||'ALL')+'_'+q);
+  if(raw.length>1||v||sevFilter) logSearch((v||'ALL')+'_'+(document.getElementById('sel-t').value||'ALL')+'_'+raw);
 }
 
 function onSearch(el){
