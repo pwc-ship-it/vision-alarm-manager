@@ -195,55 +195,10 @@
 <div id="fb-setup">
   <div class="fbs-box">
     <div class="fbs-title">⚡ Firebase 설정</div>
-    <div class="fbs-sub">Firebase Realtime Database를 연결하면 전 세계 어디서든 조치방안을 실시간으로 공유할 수 있습니다.<br>설정은 최초 1회만 필요합니다.</div>
 
     <div class="step-box">
-      <div class="step-num">STEP 1 — Firebase 프로젝트 만들기</div>
-      <div class="step-txt">
-        1. <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> 접속<br>
-        2. <b>프로젝트 추가</b> 클릭 → 이름 입력 (예: vision-alarm-manager) → 만들기<br>
-        3. 구글 애널리틱스는 <b>사용 안 함</b> 선택해도 됩니다
-      </div>
-    </div>
-
-    <div class="step-box">
-      <div class="step-num">STEP 2 — Realtime Database 생성</div>
-      <div class="step-txt">
-        1. 왼쪽 메뉴 <b>빌드 → Realtime Database</b> 클릭<br>
-        2. <b>데이터베이스 만들기</b> → 위치 선택 (아시아 권장: <b>asia-southeast1</b>) → 다음<br>
-        3. 보안 규칙: <b>테스트 모드로 시작</b> 선택 → 활성화<br>
-        4. 생성된 DB URL 복사 (예: <span style="color:var(--blue)">https://프로젝트명-default-rtdb.asia-southeast1.firebasedatabase.app</span>)
-      </div>
-    </div>
-
-    <div class="step-box">
-      <div class="step-num">STEP 3 — 보안 규칙 설정 (규칙 탭에 붙여넣기)</div>
-      <div class="step-txt">Realtime Database → 규칙 탭 → 아래 내용으로 교체 후 게시:</div>
-      <div class="code-box">{
-  "rules": {
-    "actions": {
-      ".read": true,
-      ".write": true
-    },
-    "alarmEdits": {
-      ".read": true,
-      ".write": true
-    },
-    "auditLog": {
-      ".read": true,
-      ".write": true
-    },
-    "searchLog": {
-      ".read": true,
-      ".write": true
-    }
-  }
-}</div>
-    </div>
-
-    <div class="step-box">
-      <div class="step-num">STEP 4 — Database URL 입력</div>
-      <div class="step-txt">위에서 복사한 Database URL을 아래에 입력하세요:</div>
+      <div class="step-num">Database URL 입력</div>
+      <div class="step-txt">Firebase Realtime Database URL을 입력하세요:</div>
       <input class="fbs-inp" type="text" id="fb-url-inp"
         placeholder="https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app">
       <div class="fbs-note">※ 끝에 슬래시(/) 없이 입력하세요</div>
