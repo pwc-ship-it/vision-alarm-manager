@@ -229,6 +229,39 @@ const I18N = {
     close:            '닫기',
     cancel:           '취소',
     offline_notice:   '오프라인 모드',
+    // 랭킹 토글
+    rank_7d:          '7일',
+    rank_all:         '전체',
+    rank_no_data:     '기록 없음',
+    // 상태 라벨
+    status_unset:     '미지정',
+    status_resolved:  '✅ 해결됨',
+    status_temp:      '⚠️ 임시조치',
+    status_checking:  '🔍 확인중',
+    status_default:   '📌 Default',
+    // 조치방안 폼
+    action_placeholder: '조치 내용을 상세히 입력하세요\n(증상 / 원인 확인 방법 / 조치 절차 / 결과)',
+    // Trouble 상세
+    resolution_time:  '조치 시간',
+    hour:             '시간',
+    minute:           '분',
+    // 기타
+    none:             '없음',
+    added:            '추가됨',
+    all_vision:       '전체 Vision',
+    all_type:         '전체 타입',
+    // 조치방안 카드 버튼
+    edit:             '✏️ 수정',
+    delete_admin:     '🗑️ 삭제',
+    helpful:          '👍 도움됐어요',
+    action_add_title: '+ 조치방안 등록',
+    action_edit_title:'✏️ 조치방안 수정',
+    name_required:    '이름 (필수)',
+    site_optional:    '현장 (선택)',
+    ref_link:         '🔗 참고 자료 URL (선택)',
+    // 알람 수정/삭제
+    alarm_edit:       '✏️ 수정',
+    alarm_delete:     '🗑️ 삭제',
   },
   en: {
     btn_all_actions:  '📋 All Actions',
@@ -283,6 +316,39 @@ const I18N = {
     close:            'Close',
     cancel:           'Cancel',
     offline_notice:   'Offline Mode',
+    // rank toggle
+    rank_7d:          '7 Days',
+    rank_all:         'All Time',
+    rank_no_data:     'No records',
+    // status labels
+    status_unset:     'Unspecified',
+    status_resolved:  '✅ Resolved',
+    status_temp:      '⚠️ Temporary',
+    status_checking:  '🔍 Checking',
+    status_default:   '📌 Default',
+    // action form
+    action_placeholder: 'Describe the action plan in detail\n(Symptom / Root cause / Steps / Result)',
+    // Trouble detail
+    resolution_time:  'Resolution Time',
+    hour:             'hr',
+    minute:           'min',
+    // misc
+    none:             'None',
+    added:            'Added',
+    all_vision:       'All Vision',
+    all_type:         'All Types',
+    // action card buttons
+    edit:             '✏️ Edit',
+    delete_admin:     '🗑️ Delete',
+    helpful:          '👍 Helpful',
+    action_add_title: '+ Add Action Plan',
+    action_edit_title:'✏️ Edit Action Plan',
+    name_required:    'Name (required)',
+    site_optional:    'Site (optional)',
+    ref_link:         '🔗 Reference URL (optional)',
+    // alarm edit/delete
+    alarm_edit:       '✏️ Edit',
+    alarm_delete:     '🗑️ Delete',
   }
 };
 
@@ -405,13 +471,13 @@ function renderVisionSelects(){
   ['sel-v'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     const cur=el.value;
-    el.innerHTML=`<option value="">전체 Vision</option>`+visions.map(v=>`<option value="${v}">${v}</option>`).join('');
+    el.innerHTML=`<option value="">${t('all_vision')}</option>`+visions.map(v=>`<option value="${v}">${v}</option>`).join('');
     if(cur) el.value=cur;
   });
   ['sel-t'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     const cur=el.value;
-    el.innerHTML=`<option value="">전체 타입</option>`+types.map(t=>`<option value="${t}">${t}</option>`).join('');
+    el.innerHTML=`<option value="">${t('all_type')}</option>`+types.map(t=>`<option value="${t}">${t}</option>`).join('');
     if(cur) el.value=cur;
   });
 
@@ -419,7 +485,7 @@ function renderVisionSelects(){
   const aav=document.getElementById('aa-v');
   if(aav){
     const cur=aav.value;
-    aav.innerHTML=`<option value="">전체 Vision</option>`+visions.map(v=>`<option value="${v}">${v}</option>`).join('');
+    aav.innerHTML=`<option value="">${t('all_vision')}</option>`+visions.map(v=>`<option value="${v}">${v}</option>`).join('');
     if(cur) aav.value=cur;
   }
 
@@ -450,8 +516,14 @@ function hl(s,q){
   });
   return result;
 }
-const SLBL = {resolved:'✅ 해결됨', temp:'⚠️ 임시조치', checking:'🔍 확인중', default:'📌 Default'};
+const SLBL = ()=>({
+  resolved: t('status_resolved'),
+  temp:     t('status_temp'),
+  checking: t('status_checking'),
+  default:  t('status_default')
+});
 const SCLS = {resolved:'sp resolved', temp:'sp temp', checking:'sp checking', default:'sp default', '':'sp none'};
+function slbl(status){ return SLBL()[status] || t('status_unset'); }
 
 // ══════════════════════════════════════
 //  SAVE (Firebase + LocalStorage)
@@ -603,7 +675,7 @@ function renderList(q=''){
     const isCur=curAlarm&&ak(curAlarm)===k;
     const vcls=g.severity==='Critical'?'vr':g.severity==='Warning'?'vy':'';
     const lastSt=acts.length?acts[acts.length-1].status:'';
-    const sdot=lastSt?`<span class="sdot sd-${lastSt}" title="${SLBL[lastSt]||''}"></span>`:'';
+    const sdot=lastSt?`<span class="sdot sd-${lastSt}" title="${slbl(lastSt)}"></span>`:'';
     const isCustom=a.isCustom?'custom-alarm':'';
     return `<div class="ai${isCur?' cur':''} ${vcls}${hasActs?'':' no-act'} ${isCustom}" onclick="selAlarm(${a.id})" id="ai-${a.id}">
       <div class="ai-top">
@@ -611,7 +683,7 @@ function renderList(q=''){
         <span class="sb ${g.severity}">${g.severity}</span>
         <span class="tt">${g.type}</span>
         <span class="vt">${g.vision.replace('Vision','')}</span>
-        ${a.isCustom?'<span class="custom-badge">추가됨</span>':''}
+        ${a.isCustom?`<span class="custom-badge">${t('added')}</span>`:''}
         <button class="star-b ${isFav?'on':''}" onclick="event.stopPropagation();toggleFav('${k}')" title="${isFav?'즐겨찾기 해제':'즐겨찾기'}">★</button>
       </div>
       <div class="ai-name">${needsTranslation(g.name) ? `<span class="translating">${hl(g.name,q)}</span>` : hl(g.name,q)}</div>
@@ -758,12 +830,12 @@ function renderDetail(a){
         <span class="tt">${g.type}</span>
         <span style="font-size:11px;color:var(--text3)">${g.vision}</span>
       </div>
-      <div class="dpt">${esc(g.name)}</div>
+      <div class="dpt">${enText(g.name)}</div>
       <div class="dpa">
         <button class="btn sm ${isFav?'':'primary'}" onclick="toggleFav('${k}')">${isFav?'⭐ 해제':'☆ 즐겨찾기'}</button>
         ${isAdmin?`<button class="btn sm" onclick="showEF('${k}')">✏️ 알람정보 수정</button>`:''}
-        ${a.isCustom?`<button class="btn sm" onclick="openEditAlarmModal(${a.id})" style="background:var(--bg4);border-color:var(--yellow);color:var(--yellow)">✏️ 수정</button>`:''}
-        ${a.isCustom?`<button class="btn sm" onclick="deleteCustomAlarm(${a.id})" style="background:var(--redbg);border-color:var(--red);color:var(--red)">🗑️ 삭제</button>`:''}
+        ${a.isCustom?`<button class="btn sm" onclick="openEditAlarmModal(${a.id})" style="background:var(--bg4);border-color:var(--yellow);color:var(--yellow)">${t('alarm_edit')}</button>`:''}
+        ${a.isCustom?`<button class="btn sm" onclick="deleteCustomAlarm(${a.id})" style="background:var(--redbg);border-color:var(--red);color:var(--red)">${t('alarm_delete')}</button>`:''}
         <button class="btn sm" onclick="shareLink('${k}')">🔗 공유</button>
         <button class="btn sm ghost" onclick="window.print()">🖨️</button>
         <button class="btn sm ghost" onclick="document.getElementById('dp').classList.remove('open');curAlarm=null;showDpResizer(false);try{const u=new URL(location.href);u.searchParams.delete('v');u.searchParams.delete('t');u.searchParams.delete('c');history.replaceState({},'',u);}catch{}">✕</button>
@@ -774,12 +846,12 @@ function renderDetail(a){
         <div class="st">기본 정보</div>
         ${g.type==='Trouble'?`
         <div class="ig" style="margin-top:9px">
-          ${g.tr_site?`<div class="ic"><div class="icl">사이트</div><div class="icv">${esc(g.tr_site)}</div></div>`:''}
-          ${g.tr_unit?`<div class="ic"><div class="icl">호기</div><div class="icv">${esc(g.tr_unit)}</div></div>`:''}
-          <div class="ic"><div class="icl">조치 시간</div><div class="icv">${(g.tr_hour||0)+'시간 '+(g.tr_min||0)+'분'}</div></div>
-          ${g.tr_keywords&&g.tr_keywords.length?`<div class="ic f"><div class="icl">키워드</div><div class="icv">${g.tr_keywords.map(t=>`<span style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:11px;margin-right:3px">${esc(t)}</span>`).join('')}</div></div>`:''}
-          ${g.tr_desc?`<div class="ic f"><div class="icl">발생 현상</div><div class="icv">${esc(g.tr_desc)}</div></div>`:''}
-          ${g.direct_cause?`<div class="ic f"><div class="icl">원인/내용</div><div class="icv">${esc(g.direct_cause)}</div></div>`:''}
+          ${g.tr_site?`<div class="ic"><div class="icl">${t('tr_site')}</div><div class="icv">${esc(g.tr_site)}</div></div>`:''}
+          ${g.tr_unit?`<div class="ic"><div class="icl">${t('tr_unit')}</div><div class="icv">${esc(g.tr_unit)}</div></div>`:''}
+          <div class="ic"><div class="icl">${t('resolution_time')}</div><div class="icv">${(g.tr_hour||0)+t('hour')+' '+(g.tr_min||0)+t('minute')}</div></div>
+          ${g.tr_keywords&&g.tr_keywords.length?`<div class="ic f"><div class="icl">${t('tr_keywords')}</div><div class="icv">${g.tr_keywords.map(kw=>`<span style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:11px;margin-right:3px">${esc(kw)}</span>`).join('')}</div></div>`:''}
+          ${g.tr_desc?`<div class="ic f"><div class="icl">${t('tr_desc')}</div><div class="icv">${enText(g.tr_desc)}</div></div>`:''}
+          ${g.direct_cause?`<div class="ic f"><div class="icl">${t('direct_cause')}</div><div class="icv">${enText(g.direct_cause)}</div></div>`:''}
         </div>`:`
         <div class="ig" style="margin-top:9px">
           <div class="ic f"><div class="icl">${t('direct_cause')}</div><div class="icv">${enText(g.direct_cause)}</div></div>
@@ -808,22 +880,22 @@ function renderDetail(a){
             :'<div style="color:var(--text3);font-size:12px;padding:6px 0">아직 등록된 조치방안이 없습니다.</div>'}
         </div>
         <div class="af" style="margin-top:10px">
-          <div class="af-tit">+ 조치방안 등록</div>
+          <div class="af-tit">${t('action_add_title')}</div>
           <div class="fr">
-            <input type="text" id="ac-auth" placeholder="이름 (필수)" value="${esc(savedAuthor)}" maxlength="20">
-            <input type="text" id="ac-site" placeholder="현장 (선택)" value="${esc(savedSite)}" maxlength="20">
+            <input type="text" id="ac-auth" placeholder="${t('name_required')}" value="${esc(savedAuthor)}" maxlength="20">
+            <input type="text" id="ac-site" placeholder="${t('site_optional')}" value="${esc(savedSite)}" maxlength="20">
           </div>
-          <textarea id="ac-txt" placeholder="조치 내용을 상세히 입력하세요&#10;(증상 / 원인 확인 방법 / 조치 절차 / 결과)" rows="4"></textarea>
+          <textarea id="ac-txt" placeholder="${t('action_placeholder')}" rows="4"></textarea>
           <input type="text" id="ac-link" placeholder="🔗 참고 자료 URL (선택 · 구글드라이브, 사진 링크 등)" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%">
           <div class="fr" style="align-items:center">
             <select id="ac-st">
-              <option value="">상태 미지정</option>
-              <option value="default">📌 Default</option>
-              <option value="resolved">✅ 해결됨</option>
-              <option value="temp">⚠️ 임시조치</option>
-              <option value="checking">🔍 확인중</option>
+              <option value="">${t('status_unset')}</option>
+              <option value="default">${t('status_default')}</option>
+              <option value="resolved">${t('status_resolved')}</option>
+              <option value="temp">${t('status_temp')}</option>
+              <option value="checking">${t('status_checking')}</option>
             </select>
-            <button class="btn primary" id="ac-submit-btn" onclick="addAction('${k}')">등록</button>
+            <button class="btn primary" id="ac-submit-btn" onclick="addAction('${k}')">${t('submit_action')}</button>
           </div>
         </div>
       </div>
@@ -836,7 +908,7 @@ function actCard(ac,k,i,allActs){
   const helpful=ac.helpful||0;
   const voted=(gS('vam_voted_'+k,[]))[i];
   const sCls=SCLS[ac.status||'']||'sp none';
-  const sLbl=SLBL[ac.status]||'미지정';
+  const sLbl=slbl(ac.status);
   const best=helpful>=3&&helpful===Math.max(...allActs.map(a=>a&&a.helpful||0))&&allActs.length>1;
   const linkHtml=ac.link?`<a href="${esc(ac.link)}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent);display:inline-flex;align-items:center;gap:3px;margin-top:5px;text-decoration:none;background:var(--aglow);padding:2px 8px;border-radius:4px;border:1px solid rgba(79,124,255,.2)">🔗 참고 자료 열기</a>`:'';
   return `<div class="ac${best?' best':''}" id="ac-${k}-${i}">
@@ -846,15 +918,15 @@ function actCard(ac,k,i,allActs){
       ${ac.site?`<span class="ac-site">· ${esc(ac.site)}</span>`:''}
       <span>${ac.date}</span>
       <span style="margin-left:auto;display:flex;gap:4px">
-        <button onclick="showEditAction('${k}',${i})" style="background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="수정">✏️ 수정</button>
-        ${isAdmin?`<button onclick="deleteAction('${k}',${i})" style="background:none;border:1px solid rgba(255,77,106,.3);border-radius:4px;color:var(--red);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="삭제 (Admin)">🗑️ 삭제</button>`:''}
+        <button onclick="showEditAction('${k}',${i})" style="background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="${t('edit')}">${t('edit')}</button>
+        ${isAdmin?`<button onclick="deleteAction('${k}',${i})" style="background:none;border:1px solid rgba(255,77,106,.3);border-radius:4px;color:var(--red);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="${t('delete_admin')}">${t('delete_admin')}</button>`:''}
       </span>
     </div>
     <div class="ac-txt">${esc(ac.text)}</div>
     ${linkHtml}
     <div class="ac-foot">
       <span class="${sCls}">${sLbl}</span>
-      <button class="hb ${voted?'voted':''}" onclick="markHelpful('${k}',${i})">👍 도움됐어요${helpful>0?' <b>'+helpful+'</b>':''}</button>
+      <button class="hb ${voted?'voted':''}" onclick="markHelpful('${k}',${i})">${t('helpful')}${helpful>0?' <b>'+helpful+'</b>':''}</button>
     </div>
   </div>`;
 }
@@ -869,19 +941,19 @@ function showEditAction(k,idx){
   form.className='ac-edit-form';
   form.style.cssText='margin-top:8px;padding:10px;background:var(--bg4);border-radius:var(--r);border:1px solid var(--border2);display:flex;flex-direction:column;gap:6px';
   form.innerHTML=`
-    <div style="font-size:10px;color:var(--yellow);font-weight:500">✏️ 조치방안 수정</div>
+    <div style="font-size:10px;color:var(--yellow);font-weight:500">${t('action_edit_title')}</div>
     <textarea id="ea-txt-${k}-${idx}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:7px;width:100%;min-height:80px;resize:vertical" >${esc(ac.text)}</textarea>
     <input type="text" id="ea-link-${k}-${idx}" placeholder="참고 자료 URL (선택, 구글드라이브·사진 링크 등)" value="${esc(ac.link||'')}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%">
     <div style="display:flex;gap:5px;align-items:center">
       <select id="ea-st-${k}-${idx}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:5px 8px;flex:1">
-        <option value="" ${!ac.status?'selected':''}>상태 미지정</option>
-        <option value="default" ${ac.status==='default'?'selected':''}>📌 Default</option>
-        <option value="resolved" ${ac.status==='resolved'?'selected':''}>✅ 해결됨</option>
-        <option value="temp" ${ac.status==='temp'?'selected':''}>⚠️ 임시조치</option>
-        <option value="checking" ${ac.status==='checking'?'selected':''}>🔍 확인중</option>
+        <option value="" ${!ac.status?'selected':''}>${t('status_unset')}</option>
+        <option value="default" ${ac.status==='default'?'selected':''}>${t('status_default')}</option>
+        <option value="resolved" ${ac.status==='resolved'?'selected':''}>${t('status_resolved')}</option>
+        <option value="temp" ${ac.status==='temp'?'selected':''}>${t('status_temp')}</option>
+        <option value="checking" ${ac.status==='checking'?'selected':''}>${t('status_checking')}</option>
       </select>
-      <button class="btn primary sm" onclick="saveEditAction('${k}',${idx})">저장</button>
-      <button class="btn sm" onclick="this.closest('.ac-edit-form').remove()">취소</button>
+      <button class="btn primary sm" onclick="saveEditAction('${k}',${idx})">${t('submit_action')}</button>
+      <button class="btn sm" onclick="this.closest('.ac-edit-form').remove()">${t('cancel')}</button>
     </div>`;
   card.appendChild(form);
 }
@@ -1080,7 +1152,7 @@ function renderAllActions(mobile=false){
   const html=all.length?all.map(ac=>{
     const g=ga(ac._a);
     const sCls=SCLS[ac.status||'']||'sp none';
-    const sLbl=SLBL[ac.status]||'미지정';
+    const sLbl=slbl(ac.status);
     return `<div class="api">
       <div class="api-ref" onclick="selAlarm(${ac._a.id});${window.innerWidth>768?'closeAllActions()':''}">
         ${esc(g.vision.replace('Vision',''))} · ${esc(g.type)} · Code ${g.code} — ${esc(g.name)}
@@ -1167,9 +1239,12 @@ function renderRight(){
   const rpts = document.querySelectorAll('.rpt');
   if(rpts[0]) rpts[0].childNodes[0].textContent = t('top10')+' ';
   if(rpts[1]) rpts[1].textContent = t('recent_actions');
-  if(rpts[2]) {
-    rpts[2].childNodes[0].textContent = t('edit_history')+' ';
-  }
+  if(rpts[2]) rpts[2].childNodes[0].textContent = t('edit_history')+' ';
+  // 랭킹 기간 버튼
+  const btn7d  = document.getElementById('rank-btn-7d');
+  const btnAll = document.getElementById('rank-btn-all');
+  if(btn7d)  btn7d.textContent  = t('rank_7d');
+  if(btnAll) btnAll.textContent = t('rank_all');
   // 전체 보기 버튼
   const viewAllBtn = document.querySelector('#rp .btn[onclick="openAllActions()"]');
   if(viewAllBtn) viewAllBtn.textContent = t('view_all');
@@ -1187,7 +1262,7 @@ function renderRight(){
       <div style="flex:1;overflow:hidden"><div class="rt-tx" title="${esc(lbl)}">${esc(lbl)}</div><div class="rbar" style="width:${pct}%"></div></div>
       <span class="rt-cn">${cnt}</span>
     </div>`;
-  }).join(''):'<div style="font-size:11px;color:var(--text3)">기록 없음</div>';
+  }).join(''):`<div style="font-size:11px;color:var(--text3)">${t('rank_no_data')}</div>`;
 
   // Recent actions - 10개로 확장
   const allActs=[];
@@ -1200,15 +1275,12 @@ function renderRight(){
   document.getElementById('recent-acts').innerHTML=allActs.slice(0,10).map(ac=>{
     const g=ga(ac._a);
     const sCls=SCLS[ac.status||'']||'sp none';
-    const statusLbl = currentLang==='en'
-      ? {resolved:'✅ Resolved',temp:'⚠️ Temporary',checking:'🔍 Checking',default:'📌 Default'}[ac.status]||'Unspecified'
-      : SLBL[ac.status]||'미지정';
     return `<div class="hi" onclick="jumpTo('${ac._k}')">
       <span class="hi-t">${g.vision.replace('Vision','')} · Code ${g.code}</span>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">${esc((ac.text||'').slice(0,45))}${(ac.text||'').length>45?'…':''}</div>
-      <div class="hi-m">${ac.date} · ${esc(ac.author)} <span class="${sCls}" style="font-size:9px;padding:1px 5px">${statusLbl}</span></div>
+      <div class="hi-m">${ac.date} · ${esc(ac.author)} <span class="${sCls}" style="font-size:9px;padding:1px 5px">${slbl(ac.status)}</span></div>
     </div>`;
-  }).join('')||`<div style="font-size:11px;color:var(--text3)">${currentLang==='en'?'None':'없음'}</div>`;
+  }).join('')||`<div style="font-size:11px;color:var(--text3)">${t('none')}</div>`;
 
   // Audit - 10개로 확장, 등록/수정/삭제 아이콘 추가
   const typeIconKo={'조치방안 등록':'✅','조치방안 수정':'✏️','조치방안 삭제':'🗑️','알람 정보 수정':'🔧','Excel 업로드':'📤','알람 추가':'➕'};
@@ -1713,7 +1785,7 @@ function mobNav(page,btn){
     document.getElementById('mob-sheet').innerHTML=`
       <div class="sbl">Vision</div>
       <select class="fc" id="m-v" onchange="syncM()"><option value="">전체</option><option>NotchingVision</option><option>FoilVision</option><option>DelaminationVision</option><option>NGVision</option></select>
-      <select class="fc" id="m-t" onchange="syncM()"><option value="">전체 타입</option><option>HOST</option><option>Vision</option></select>
+      <select class="fc" id="m-t" onchange="syncM()"><option value="">${t('all_type')}</option><option>HOST</option><option>Vision</option></select>
       <div class="sbl">키워드</div>
       <input class="fc" type="text" id="m-q" placeholder="코드 또는 키워드" oninput="syncM()">
       <div class="sbl">심각도</div>
