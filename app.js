@@ -435,6 +435,26 @@ if(!siteUnits || !Array.isArray(siteUnits) || siteUnits.length === 0){
 
 // 사이트명 정규화: LGESWA → ESWA, ESWA → ESWA
 function normalizeSite(s){ return (s||'').replace(/^LGES/, 'ES').toUpperCase(); }
+
+// 호기 정렬: 숫자 > 문자 순 (1-1A, 1-1C, 1-2A, 1-2C, 2-1A ...)
+function sortUnits(units){
+  return [...units].sort((a, b) => {
+    // 숫자와 문자를 분리해서 비교
+    const parseUnit = s => {
+      const parts = s.match(/(\d+)/g) || [];
+      const chars = s.replace(/\d+/g, '').replace(/[-]/g, '');
+      return { nums: parts.map(Number), str: chars };
+    };
+    const pa = parseUnit(a), pb = parseUnit(b);
+    // 숫자 부분 순차 비교
+    for(let i = 0; i < Math.max(pa.nums.length, pb.nums.length); i++){
+      const na = pa.nums[i] ?? -1, nb = pb.nums[i] ?? -1;
+      if(na !== nb) return na - nb;
+    }
+    // 숫자 같으면 문자 비교
+    return pa.str.localeCompare(pb.str);
+  });
+}
 let alarms = [...RAW.map(a=>({...a})), ...customAlarms.map(a=>({...a}))];
 let actions    = gS('vam_actions', {});
 let favorites  = gS('vam_favorites', []);
@@ -1426,7 +1446,7 @@ function renderUnitSelect(site, selId='na-unit', selectedUnit=''){
     return;
   }
   el.innerHTML = `<option value="">-- 선택 --</option>`
-    + su.units.map(u=>`<option value="${u}"${u===selectedUnit?' selected':''}>${u}</option>`).join('');
+    + sortUnits(su.units).map(u=>`<option value="${u}"${u===selectedUnit?' selected':''}>${u}</option>`).join('');
 }
 
 function onNaSiteChange(){
@@ -1667,9 +1687,9 @@ function renderSiteManageModal(){
   document.getElementById('vm-selected-site').textContent=vmCurrentSite?`— ${vmCurrentSite}`:'';
   document.getElementById('vm-unit-add-row').style.display=vmCurrentSite?'flex':'none';
   document.getElementById('vm-unit-list').innerHTML=vmCurrentSite
-    ? (suSel?.units.map((u,i)=>
-        `<div class="vm-item"><span>${u}</span><button onclick="deleteUnit('${vmCurrentSite}',${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`
-      ).join('')||`<div style="font-size:11px;color:var(--text3)">호기 없음</div>`)
+    ? (suSel ? sortUnits(suSel.units).map((u,i)=>
+        `<div class="vm-item"><span>${u}</span><button onclick="deleteUnit('${vmCurrentSite}',${suSel.units.indexOf(u)})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`
+      ).join('')||`<div style="font-size:11px;color:var(--text3)">호기 없음</div>` : '')
     : `<div style="font-size:11px;color:var(--text3)">← 사이트를 선택하세요</div>`;
 }
 
