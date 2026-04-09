@@ -72,8 +72,15 @@ function updateStats(){
 //  FILTERS & LIST
 // ══════════════════════════════════════
 function applyFilters(){
-  const v=document.getElementById('sel-v').value;
-  const tp=document.getElementById('sel-t').value;
+  // 모바일 필터 시트가 열려있을 경우 m-v / m-t 값을 우선 사용
+  const mobV = document.getElementById('m-v');
+  const mobT = document.getElementById('m-t');
+  const v  = (mobV && document.getElementById('mob-sheet').style.display==='flex')
+             ? mobV.value
+             : document.getElementById('sel-v').value;
+  const tp = (mobT && document.getElementById('mob-sheet').style.display==='flex')
+             ? mobT.value
+             : document.getElementById('sel-t').value;
   const raw = (document.getElementById('srch').value||'').trim().replace(/\s+/g,' ').toLowerCase();
   const qTerms = raw ? raw.split(' ').filter(Boolean) : [];
   const sort=document.getElementById('sort-sel').value;
