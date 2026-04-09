@@ -68,17 +68,22 @@ function startPolling(){
           auditLog = newAudit; changed = true;
         }
       }
-      if(caData && Array.isArray(caData) && JSON.stringify(caData)!==JSON.stringify(customAlarms)){
-        customAlarms = caData; sS('vam_custom_alarms', customAlarms); rebuildAlarms(); changed = true;
+      // Firebase 배열→객체 변환 대응
+      if(caData && typeof caData === 'object'){
+        const arr = Array.isArray(caData) ? caData : Object.values(caData);
+        if(JSON.stringify(arr)!==JSON.stringify(customAlarms)){ customAlarms=arr; sS('vam_custom_alarms',customAlarms); rebuildAlarms(); changed=true; }
       }
-      if(cvData && Array.isArray(cvData) && JSON.stringify(cvData)!==JSON.stringify(customVisions)){
-        customVisions = cvData; sS('vam_custom_visions', customVisions); renderVisionSelects(); changed = true;
+      if(cvData && typeof cvData === 'object'){
+        const arr = Array.isArray(cvData) ? cvData : Object.values(cvData);
+        if(JSON.stringify(arr)!==JSON.stringify(customVisions)){ customVisions=arr; sS('vam_custom_visions',customVisions); renderVisionSelects(); changed=true; }
       }
-      if(ctData && Array.isArray(ctData) && JSON.stringify(ctData)!==JSON.stringify(customTypes)){
-        customTypes = ctData; sS('vam_custom_types', customTypes); renderVisionSelects(); changed = true;
+      if(ctData && typeof ctData === 'object'){
+        const arr = Array.isArray(ctData) ? ctData : Object.values(ctData);
+        if(JSON.stringify(arr)!==JSON.stringify(customTypes)){ customTypes=arr; sS('vam_custom_types',customTypes); renderVisionSelects(); changed=true; }
       }
-      if(suData && Array.isArray(suData) && JSON.stringify(suData)!==JSON.stringify(siteUnits)){
-        siteUnits = suData; sS('vam_site_units', siteUnits); changed = true;
+      if(suData && typeof suData === 'object'){
+        const arr = Array.isArray(suData) ? suData : Object.values(suData);
+        if(JSON.stringify(arr)!==JSON.stringify(siteUnits)){ siteUnits=arr; sS('vam_site_units',siteUnits); changed=true; }
       }
       if(changed){
         renderRight();
@@ -121,10 +126,23 @@ async function initFirebase(){
     if(actData && typeof actData === 'object') actions = actData;
     if(editData && typeof editData === 'object') alarmEdits = editData;
     if(auditData && typeof auditData === 'object') auditLog = Array.isArray(auditData) ? auditData : Object.values(auditData);
-    if(caData && Array.isArray(caData)){ customAlarms = caData; sS('vam_custom_alarms', customAlarms); }
-    if(cvData && Array.isArray(cvData)){ customVisions = cvData; sS('vam_custom_visions', customVisions); }
-    if(ctData && Array.isArray(ctData)){ customTypes = ctData; sS('vam_custom_types', customTypes); }
-    if(suData && Array.isArray(suData)){ siteUnits = suData; sS('vam_site_units', siteUnits); }
+    // Firebase는 배열을 객체({0:{...},1:{...}})로 저장하는 경우가 있으므로 양쪽 처리
+    if(caData && typeof caData === 'object'){
+      const arr = Array.isArray(caData) ? caData : Object.values(caData);
+      if(arr.length){ customAlarms = arr; sS('vam_custom_alarms', customAlarms); }
+    }
+    if(cvData && typeof cvData === 'object'){
+      const arr = Array.isArray(cvData) ? cvData : Object.values(cvData);
+      if(arr.length){ customVisions = arr; sS('vam_custom_visions', customVisions); }
+    }
+    if(ctData && typeof ctData === 'object'){
+      const arr = Array.isArray(ctData) ? ctData : Object.values(ctData);
+      if(arr.length){ customTypes = arr; sS('vam_custom_types', customTypes); }
+    }
+    if(suData && typeof suData === 'object'){
+      const arr = Array.isArray(suData) ? suData : Object.values(suData);
+      if(arr.length){ siteUnits = arr; sS('vam_site_units', siteUnits); }
+    }
 
     rebuildAlarms();
     console.log('[Firebase] 로드 완료 - actions:', Object.keys(actions).length, '개');
