@@ -24,31 +24,39 @@ function mobNav(page,btn){
   document.getElementById('dp').classList.remove('open');
 
   if(page==='filter'){
+    // 현재 필터 상태 반영
+    const curV = document.getElementById('sel-v').value;
+    const curT = document.getElementById('sel-t').value;
+    const curQ = document.getElementById('srch').value;
+    const curNA = document.getElementById('noact-f').checked;
+    const visions = getVisionList();
+    const types = getTypeList();
+
     document.getElementById('mob-sheet').style.display='flex';
     document.getElementById('mob-sheet').innerHTML=`
       <div class="sbl">Vision</div>
       <select class="fc" id="m-v" onchange="syncM()">
         <option value="">${t('all_vision')}</option>
-        <option>NotchingVision</option><option>FoilVision</option>
-        <option>DelaminationVision</option><option>NGVision</option>
+        ${visions.map(v=>`<option value="${v}"${v===curV?' selected':''}>${v}</option>`).join('')}
       </select>
       <select class="fc" id="m-t" onchange="syncM()">
         <option value="">${t('all_type')}</option>
-        <option>HOST</option><option>Vision</option>
+        ${types.map(tp=>`<option value="${tp}"${tp===curT?' selected':''}>${tp}</option>`).join('')}
       </select>
       <div class="sbl">${t('mob_keyword')}</div>
-      <input class="fc" type="text" id="m-q" placeholder="${t('search_ph')}" oninput="syncM()">
+      <input class="fc" type="text" id="m-q" placeholder="${t('search_ph')}" value="${esc(curQ)}" oninput="syncM()">
       <div class="sbl">${t('mob_severity')}</div>
       <div class="pills">
-        <button class="pill on" onclick="setMS(this,'')">${t('mob_all')}</button>
-        <button class="pill rc" onclick="setMS(this,'Critical')">Critical</button>
-        <button class="pill yc" onclick="setMS(this,'Warning')">Warning</button>
-        <button class="pill bc" onclick="setMS(this,'Info')">Info</button>
+        <button class="pill ${sevFilter===''?'on':''}" onclick="setMS(this,'')">${t('mob_all')}</button>
+        <button class="pill rc ${sevFilter==='Critical'?'on':''}" onclick="setMS(this,'Critical')">Critical</button>
+        <button class="pill yc ${sevFilter==='Warning'?'on':''}" onclick="setMS(this,'Warning')">Warning</button>
+        <button class="pill bc ${sevFilter==='Info'?'on':''}" onclick="setMS(this,'Info')">Info</button>
       </div>
       <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2)">
-        <input type="checkbox" id="m-na" onchange="syncM()"> ${t('mob_noact')}
+        <input type="checkbox" id="m-na" onchange="syncM()"${curNA?' checked':''}> ${t('mob_noact')}
       </label>
       <button class="btn primary" onclick="mobNav('list',document.querySelectorAll('.mn')[0])">${t('mob_result')}</button>`;
+
   } else if(page==='acts'){
     document.getElementById('mob-sheet').style.display='flex';
     document.getElementById('mob-sheet').innerHTML=`
@@ -58,6 +66,7 @@ function mobNav(page,btn){
       </div>
       <div id="mob-acts-body"></div>`;
     renderAllActions(true);
+
   } else if(page==='fav'){
     document.getElementById('mob-sheet').style.display='flex';
     document.getElementById('mob-sheet').innerHTML=`
@@ -72,7 +81,47 @@ function mobNav(page,btn){
         return `<div class="si" onclick="jumpTo('${k}');mobNav('list',document.querySelectorAll('.mn')[0])"><span class="si-dot"></span><span>${esc(p[0].replace('Vision',''))} · C${p[2]}</span></div>`;
       }).join('')||`<div style="color:var(--text3);font-size:12px">${t('none')}</div>`}
       <button class="btn" style="margin-top:12px" onclick="mobNav('list',document.querySelectorAll('.mn')[0])">${t('mob_back')}</button>`;
+
+  } else if(page==='more'){
+    document.getElementById('mob-sheet').style.display='flex';
+    document.getElementById('mob-sheet').innerHTML=`
+      <div class="sbl" style="margin-bottom:4px">⚙️ ${currentLang==='en'?'More':'더보기'}</div>
+
+      <button class="btn primary" style="width:100%;text-align:left;padding:12px 14px;font-size:13px" onclick="closeMoreSheet();openAddAlarmModal()">
+        ➕ ${t('btn_add_alarm')}
+      </button>
+
+      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px" onclick="closeMoreSheet();toggleLang()">
+        🌐 ${currentLang==='en'?'Switch to Korean (KO)':'Switch to English (EN)'}
+      </button>
+
+      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px" onclick="closeMoreSheet();openFbSetup()">
+        ⚙️ Firebase ${currentLang==='en'?'Setup':'설정'}
+        ${fbOnline?'<span style="font-size:10px;color:var(--green);margin-left:6px">● '+t('db_online')+'</span>':'<span style="font-size:10px;color:var(--red);margin-left:6px">● '+t('db_offline')+'</span>'}
+      </button>
+
+      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px" onclick="closeMoreSheet();showQR()">
+        📱 QR ${currentLang==='en'?'Code':'코드'}
+      </button>
+
+      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px;${isAdmin?'border-color:var(--yellow);color:var(--yellow)':''}" onclick="closeMoreSheet();toggleAdmin()">
+        👤 ${isAdmin?(currentLang==='en'?'Switch to Viewer':'뷰어로 전환'):(currentLang==='en'?'Switch to Admin':'관리자로 전환')}
+        <span style="font-size:10px;margin-left:6px;opacity:.7">${isAdmin?'ADMIN':'VIEWER'}</span>
+      </button>
+
+      <div style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn ghost" style="width:100%;padding:10px" onclick="closeMoreSheet()">
+          ${currentLang==='en'?'Close':'닫기'} ✕
+        </button>
+      </div>`;
   }
+}
+
+function closeMoreSheet(){
+  document.getElementById('mob-sheet').style.display='none';
+  // 더보기 버튼 활성화 해제
+  document.querySelectorAll('.mn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.mn')[0].classList.add('on');
 }
 
 function syncM(){
