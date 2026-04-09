@@ -142,6 +142,15 @@ async function initFirebase(){
     if(suData && typeof suData === 'object'){
       const arr = Array.isArray(suData) ? suData : Object.values(suData);
       if(arr.length){ siteUnits = arr; sS('vam_site_units', siteUnits); }
+      else {
+        // Firebase에 siteUnits 없으면 DEFAULT 강제 적용
+        siteUnits = DEFAULT_SITE_UNITS;
+        sS('vam_site_units', siteUnits);
+      }
+    } else {
+      // Firebase 응답 자체가 없으면 DEFAULT 강제 적용
+      siteUnits = DEFAULT_SITE_UNITS;
+      sS('vam_site_units', siteUnits);
     }
 
     rebuildAlarms();
@@ -581,11 +590,14 @@ const DEFAULT_SITE_UNITS = [
   {"site":"ESUC2","units":["1A","2A","3A","4A","5A","6A","7A"]},
   {"site":"ESWA","units":["1-1C","1-2C","2-1C","2-2C","3-1C","3-2C","3-3C","3-4C","1-1A","1-2A","2-1A","2-2A","3-1A","3-2A","3-3A","3-4A","4-1C","5-1C","6-1C","6-2C","7-1C","7-2C","25-1C","25-2C","4-1A","5-1A","6-1A","6-2A","7-1A","7-2A","25-1A","25-2A","8-1C","8-2C","9-1C","9-2C","10-1C","11-1C","11-2C","12-1C","12-2C","13-1C","14-1C","15-1C","15-2C","16-1C","16-2C","17-1C","17-2C","18-1C","18-2C","19-1C","19-2C","20-1C","21-1C","22-1C","23-1C","24-1C","8-1A","8-2A","9-1A","9-2A","10-1A","11-1A","11-2A","12-1A","12-2A","13-1A","14-1A","15-1A","15-2A","16-1A","16-2A","17-1A","17-2A","18-1A","18-2A","19-1A","19-2A","20-1A","21-1A","22-1A","23-1A","24-1A","26-1C","26-2C","27-1C","27-2C","28-1C","28-2C","26-1A","26-2A","27-1A","27-2A","28-1A","28-2A","29-1A","29-1C"]}
 ];
-let siteUnits = gS('vam_site_units', null);
-if(!siteUnits || !Array.isArray(siteUnits) || siteUnits.length === 0){
-  siteUnits = DEFAULT_SITE_UNITS;
-  sS('vam_site_units', siteUnits);
-}
+let _rawSiteUnits = gS('vam_site_units', null);
+// 배열/객체 양쪽 처리 후 비어있으면 DEFAULT 사용
+let siteUnits = (()=>{
+  if(!_rawSiteUnits) return DEFAULT_SITE_UNITS;
+  const arr = Array.isArray(_rawSiteUnits) ? _rawSiteUnits : Object.values(_rawSiteUnits);
+  return arr.length ? arr : DEFAULT_SITE_UNITS;
+})();
+sS('vam_site_units', siteUnits);
 
 function normalizeSite(s){ return (s||'').replace(/^LGES/, 'ES').toUpperCase(); }
 
