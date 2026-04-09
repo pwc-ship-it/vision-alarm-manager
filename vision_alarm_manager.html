@@ -34,16 +34,16 @@
     <div class="sbs" style="padding:10px 13px">
       <div class="sb-stat-grid">
         <div class="sb-sc" onclick="document.getElementById('noact-f').checked=false;applyFilters()">
-          <div class="sb-scn" id="st-total">0</div><div class="sb-scl">전체</div>
+          <div class="sb-scn" id="st-total">0</div><div class="sb-scl" data-i18n="stat_total">전체</div>
         </div>
         <div class="sb-sc" onclick="document.getElementById('noact-f').checked=false;applyFilters()">
-          <div class="sb-scn grn" id="st-acts">0</div><div class="sb-scl">조치방안</div>
+          <div class="sb-scn grn" id="st-acts">0</div><div class="sb-scl" data-i18n="stat_acts">조치방안</div>
         </div>
         <div class="sb-sc" onclick="document.getElementById('noact-f').checked=true;applyFilters()" style="cursor:pointer" title="클릭 시 미등록만 필터">
-          <div class="sb-scn red" id="st-noact">0</div><div class="sb-scl">미등록</div>
+          <div class="sb-scn red" id="st-noact">0</div><div class="sb-scl" data-i18n="stat_noact">미등록</div>
         </div>
         <div class="sb-sc">
-          <div class="sb-scn grn" id="st-resolved">0</div><div class="sb-scl">해결됨</div>
+          <div class="sb-scn grn" id="st-resolved">0</div><div class="sb-scl" data-i18n="stat_resolved">해결됨</div>
         </div>
       </div>
     </div>
@@ -130,7 +130,7 @@
   <div id="aap">
     <div class="aph">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span style="font-size:15px;font-weight:700">📋 전체 조치방안</span>
+        <span style="font-size:15px;font-weight:700" data-i18n="all_actions_title">📋 전체 조치방안</span>
         <span id="aap-live" class="live-dot" title="실시간 연동 중" style="display:none"></span>
         <button class="btn sm" onclick="closeAllActions()">✕</button>
       </div>
@@ -141,16 +141,16 @@
           <option>DelaminationVision</option><option>NGVision</option>
         </select>
         <select class="fc" id="aa-s" onchange="renderAllActions()" style="width:auto;font-size:11px;margin-bottom:0">
-          <option value="">전체 상태</option>
-          <option value="default">📌 Default</option>
-          <option value="resolved">✅ 해결됨</option>
-          <option value="temp">⚠️ 임시조치</option>
-          <option value="checking">🔍 확인중</option>
+          <option value="" data-i18n="all_status">전체 상태</option>
+          <option value="default" data-i18n="status_default">📌 Default</option>
+          <option value="resolved" data-i18n="status_resolved">✅ 해결됨</option>
+          <option value="temp" data-i18n="status_temp">⚠️ 임시조치</option>
+          <option value="checking" data-i18n="status_checking">🔍 확인중</option>
         </select>
         <select class="fc" id="aa-o" onchange="renderAllActions()" style="width:auto;font-size:11px;margin-bottom:0">
-          <option value="date-desc">최신순</option>
-          <option value="date-asc">오래된순</option>
-          <option value="helpful">👍 많은순</option>
+          <option value="date-desc" data-i18n="all_order_new">최신순</option>
+          <option value="date-asc" data-i18n="all_order_old">오래된순</option>
+          <option value="helpful" data-i18n="all_order_helpful">👍 많은순</option>
         </select>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:6px" id="aa-cnt"></div>
@@ -207,9 +207,9 @@
     <div id="fb-test-result"></div>
 
     <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
-      <button class="btn primary" onclick="saveFbConfig()">💾 저장 및 연결</button>
-      <button class="btn" onclick="testFbConnection()">🔗 연결 테스트</button>
-      <button class="btn ghost" onclick="closeFbSetup()" style="margin-left:auto">닫기</button>
+      <button class="btn primary" onclick="saveFbConfig()" data-i18n="fb_save">💾 저장 및 연결</button>
+      <button class="btn" onclick="testFbConnection()" data-i18n="fb_test">🔗 연결 테스트</button>
+      <button class="btn ghost" onclick="closeFbSetup()" style="margin-left:auto" data-i18n="close">닫기</button>
     </div>
     <div style="margin-top:12px;padding:10px;background:var(--bg4);border-radius:var(--r);font-size:11px;color:var(--text3);line-height:1.6">
       💡 <b style="color:var(--text2)" data-i18n="offline_notice">오프라인 모드:</b> Firebase 미설정 또는 연결 실패 시 자동으로 로컬 저장 모드로 동작합니다. 나중에 연결하면 기존 로컬 데이터가 유지됩니다.
@@ -220,47 +220,47 @@
 <!-- HISTORY MODAL -->
 <div class="mo" id="hist-mo">
   <div class="md" style="max-width:600px">
-    <div class="md-t">📋 전체 수정 이력</div>
+    <div class="md-t" data-i18n="hist_title">📋 전체 수정 이력</div>
     <div style="margin-bottom:8px">
       <select class="fc" id="hm-f" onchange="renderHistModal()" style="width:auto;font-size:11px;margin-bottom:0">
-        <option value="">전체 유형</option>
-        <option value="조치방안 등록">조치방안 등록</option>
-        <option value="알람 정보 수정">알람 수정</option>
-        <option value="Excel 업로드">업로드</option>
+        <option value="" data-i18n="hist_filter_all">전체 유형</option>
+        <option value="조치방안 등록" data-i18n="hist_filter_act">조치방안 등록</option>
+        <option value="알람 정보 수정" data-i18n="hist_filter_edit">알람 수정</option>
+        <option value="Excel 업로드" data-i18n="hist_filter_up">업로드</option>
       </select>
     </div>
     <div id="hist-mo-list" style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
-    <div class="md-a"><button class="btn" onclick="closeModal('hist-mo')">닫기</button></div>
+    <div class="md-a"><button class="btn" onclick="closeModal('hist-mo')" data-i18n="close">닫기</button></div>
   </div>
 </div>
 
 <!-- UPLOAD MODAL -->
 <div class="mo" id="up-mo">
   <div class="md">
-    <div class="md-t">📤 Excel 업로드</div>
+    <div class="md-t" data-i18n="upload_title">📤 Excel 업로드</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
       파일명 형식: <span style="color:var(--blue);font-family:var(--mono)">VisionName_Type_Alarm.xlsx</span>
     </p>
     <div class="up-area" onclick="document.getElementById('f-inp').click()">
       <input type="file" id="f-inp" accept=".xlsx" multiple onchange="handleUpload(event)">
       <div style="font-size:22px;margin-bottom:7px">📁</div>
-      <div>클릭하여 파일 선택</div>
+      <div data-i18n="upload_click">클릭하여 파일 선택</div>
     </div>
     <div id="up-status" style="margin-top:9px;font-size:12px;color:var(--text2)"></div>
-    <div class="md-a"><button class="btn" onclick="closeModal('up-mo')">닫기</button></div>
+    <div class="md-a"><button class="btn" onclick="closeModal('up-mo')" data-i18n="close">닫기</button></div>
   </div>
 </div>
 
 <!-- QR MODAL -->
 <div class="mo" id="qr-mo">
   <div class="md" style="max-width:360px;text-align:center">
-    <div class="md-t">📱 사이트 QR 코드</div>
+    <div class="md-t" data-i18n="qr_title">📱 사이트 QR 코드</div>
     <div id="qr-info" style="font-size:11px;margin-bottom:12px;padding:7px 10px;border-radius:var(--r);background:var(--bg3)"></div>
     <div id="qr-canvas" style="display:flex;justify-content:center;margin-bottom:12px"></div>
     <div id="qr-url" style="font-size:10px;color:var(--text3);word-break:break-all;margin-bottom:10px;cursor:pointer" title="클릭하여 전체 URL 보기"></div>
     <div class="md-a">
-      <button class="btn sm" onclick="copyQrUrl()">🔗 URL 복사</button>
-      <button class="btn" onclick="closeModal('qr-mo')">닫기</button>
+      <button class="btn sm" onclick="copyQrUrl()" data-i18n="qr_copy">🔗 URL 복사</button>
+      <button class="btn" onclick="closeModal('qr-mo')" data-i18n="close">닫기</button>
     </div>
   </div>
 </div>
@@ -268,7 +268,7 @@
 <!-- ADD / EDIT ALARM MODAL -->
 <div class="mo" id="add-alarm-mo">
   <div class="md" style="max-width:620px">
-    <div class="md-t" id="add-alarm-mo-title">➕ 알람 / 트러블 추가</div>
+    <div class="md-t" id="add-alarm-mo-title" data-i18n="add_alarm_title">➕ 알람 / 트러블 추가</div>
     <input type="hidden" id="na-edit-id" value="">
 
     <!-- Vision / 타입 -->
@@ -403,8 +403,8 @@
     </div>
 
     <div class="md-a">
-      <button class="btn primary" id="na-submit-btn" onclick="submitAlarmModal()">➕ 등록</button>
-      <button class="btn" onclick="closeModal('add-alarm-mo')">취소</button>
+      <button class="btn primary" id="na-submit-btn" onclick="submitAlarmModal()" data-i18n="add_alarm_submit">➕ 등록</button>
+      <button class="btn" onclick="closeModal('add-alarm-mo')" data-i18n="cancel">취소</button>
     </div>
   </div>
 </div>
@@ -412,12 +412,12 @@
 <!-- VISION/TYPE MANAGE MODAL -->
 <div class="mo" id="vision-manage-mo">
   <div class="md" style="max-width:600px">
-    <div class="md-t">⚙️ Vision / 타입 / 사이트 관리 (Admin)</div>
+    <div class="md-t">⚙️ Vision / <span data-i18n="vm_tab_type">타입</span> / <span data-i18n="vm_tab_site">사이트/호기</span> 관리 (Admin)</div>
     <!-- 탭 -->
     <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px">
       <button class="vm-tab on" id="vm-tab-vision" onclick="switchVmTab('vision')">Vision</button>
-      <button class="vm-tab" id="vm-tab-type" onclick="switchVmTab('type')">타입</button>
-      <button class="vm-tab" id="vm-tab-site" onclick="switchVmTab('site')">사이트/호기</button>
+      <button class="vm-tab" id="vm-tab-type" onclick="switchVmTab('type')" data-i18n="vm_tab_type">타입</button>
+      <button class="vm-tab" id="vm-tab-site" onclick="switchVmTab('site')" data-i18n="vm_tab_site">사이트/호기</button>
     </div>
 
     <!-- Vision 탭 -->
@@ -471,7 +471,7 @@
     <div style="font-size:10px;color:var(--text3);margin-top:10px">
       * 기본 Vision/타입은 삭제 불가. 사이트/호기는 모두 수정 가능합니다.
     </div>
-    <div class="md-a"><button class="btn" onclick="closeModal('vision-manage-mo')">닫기</button></div>
+    <div class="md-a"><button class="btn" onclick="closeModal('vision-manage-mo')" data-i18n="close">닫기</button></div>
   </div>
 </div>
 
@@ -481,6 +481,11 @@
 <script src="alarms_en.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<script src="app.js"></script>
+<script src="app-core.js"></script>
+<script src="app-render.js"></script>
+<script src="app-actions.js"></script>
+<script src="app-admin.js"></script>
+<script src="app-ui.js"></script>
+<script src="app-init.js"></script>
 </body>
 </html>
