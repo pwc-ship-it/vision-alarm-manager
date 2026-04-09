@@ -68,22 +68,30 @@ function startPolling(){
           auditLog = newAudit; changed = true;
         }
       }
-      // Firebase 배열→객체 변환 대응
+      // Firebase 배열→객체 변환 대응 (빈 데이터는 무시)
       if(caData && typeof caData === 'object'){
         const arr = Array.isArray(caData) ? caData : Object.values(caData);
-        if(JSON.stringify(arr)!==JSON.stringify(customAlarms)){ customAlarms=arr; sS('vam_custom_alarms',customAlarms); rebuildAlarms(); changed=true; }
+        if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(customAlarms)){
+          customAlarms=arr; sS('vam_custom_alarms',customAlarms); rebuildAlarms(); changed=true;
+        }
       }
       if(cvData && typeof cvData === 'object'){
         const arr = Array.isArray(cvData) ? cvData : Object.values(cvData);
-        if(JSON.stringify(arr)!==JSON.stringify(customVisions)){ customVisions=arr; sS('vam_custom_visions',customVisions); renderVisionSelects(); changed=true; }
+        if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(customVisions)){
+          customVisions=arr; sS('vam_custom_visions',customVisions); renderVisionSelects(); changed=true;
+        }
       }
       if(ctData && typeof ctData === 'object'){
         const arr = Array.isArray(ctData) ? ctData : Object.values(ctData);
-        if(JSON.stringify(arr)!==JSON.stringify(customTypes)){ customTypes=arr; sS('vam_custom_types',customTypes); renderVisionSelects(); changed=true; }
+        if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(customTypes)){
+          customTypes=arr; sS('vam_custom_types',customTypes); renderVisionSelects(); changed=true;
+        }
       }
       if(suData && typeof suData === 'object'){
         const arr = Array.isArray(suData) ? suData : Object.values(suData);
-        if(JSON.stringify(arr)!==JSON.stringify(siteUnits)){ siteUnits=arr; sS('vam_site_units',siteUnits); changed=true; }
+        if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(siteUnits)){
+          siteUnits=arr; sS('vam_site_units',siteUnits); changed=true;
+        }
       }
       if(changed){
         renderRight();
@@ -139,18 +147,15 @@ async function initFirebase(){
       const arr = Array.isArray(ctData) ? ctData : Object.values(ctData);
       if(arr.length){ customTypes = arr; sS('vam_custom_types', customTypes); }
     }
+    // siteUnits: Firebase 데이터가 실제로 있을 때만 덮어씀
+    // 빈 객체({}) 또는 null이면 DEFAULT_SITE_UNITS 유지
     if(suData && typeof suData === 'object'){
       const arr = Array.isArray(suData) ? suData : Object.values(suData);
-      if(arr.length){ siteUnits = arr; sS('vam_site_units', siteUnits); }
-      else {
-        // Firebase에 siteUnits 없으면 DEFAULT 강제 적용
-        siteUnits = DEFAULT_SITE_UNITS;
+      if(arr.length > 0){
+        siteUnits = arr;
         sS('vam_site_units', siteUnits);
       }
-    } else {
-      // Firebase 응답 자체가 없으면 DEFAULT 강제 적용
-      siteUnits = DEFAULT_SITE_UNITS;
-      sS('vam_site_units', siteUnits);
+      // arr.length === 0 이면 기존 siteUnits(DEFAULT) 그대로 유지
     }
 
     rebuildAlarms();
