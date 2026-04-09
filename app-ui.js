@@ -129,8 +129,20 @@ function syncM(){
   const tp=document.getElementById('m-t')?.value||'';
   const q=document.getElementById('m-q')?.value||'';
   const na=document.getElementById('m-na')?.checked||false;
-  document.getElementById('sel-v').value=v;
-  document.getElementById('sel-t').value=tp;
+
+  // sel-v / sel-t 가 숨겨진 사이드바 안에 있으므로
+  // value 직접 설정 후 강제로 option selected 상태도 맞춤
+  const selV = document.getElementById('sel-v');
+  const selT = document.getElementById('sel-t');
+  if(selV){
+    selV.value = v;
+    // value 설정이 안 먹힐 경우 대비: option을 직접 selected 처리
+    Array.from(selV.options).forEach(o => o.selected = (o.value === v));
+  }
+  if(selT){
+    selT.value = tp;
+    Array.from(selT.options).forEach(o => o.selected = (o.value === tp));
+  }
   document.getElementById('srch').value=q;
   document.getElementById('noact-f').checked=na;
   applyFilters();
