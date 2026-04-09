@@ -1,0 +1,576 @@
+// INTEKPLUS ALARM Manager — app-admin.js
+// 의존: app-core.js → app-render.js → app-actions.js
+
+// ══════════════════════════════════════
+//  AUDIT LOG
+// ══════════════════════════════════════
+function addAudit(type,target,user,before,after){
+  const now=new Date();
+  const date=now.toISOString().slice(0,10)+' '+now.toTimeString().slice(0,5);
+  auditLog.push({type,target,user,before,after,date});
+  if(auditLog.length>500) auditLog=auditLog.slice(-300);
+}
+
+function openHistModal(){ renderHistModal(); document.getElementById('hist-mo').classList.add('open'); }
+
+function renderHistModal(){
+  const tf=document.getElementById('hm-f')?.value||'';
+  const fl=tf?auditLog.filter(h=>h.type===tf):auditLog;
+  document.getElementById('hist-mo-list').innerHTML=fl.slice().reverse().map(h=>`
+    <div class="ac">
+      <div class="ac-meta"><span class="ac-auth">${esc(h.type)}</span><span>${esc(h.date)}</span><span>${esc(h.user)}</span></div>
+      <div class="ac-txt">${esc(h.target.split('_').slice(0,3).join(' / '))}</div>
+      ${h.after&&h.after.length<80?`<div style="font-size:10px;color:var(--text3);margin-top:3px">${esc(h.after)}</div>`:''}
+    </div>`).join('')||`<div style="color:var(--text3);font-size:12px">${t('none')}</div>`;
+}
+
+// ══════════════════════════════════════
+//  FIREBASE SETUP UI
+// ══════════════════════════════════════
+function openFbSetup(){
+  document.getElementById('fb-url-inp').value=FB_URL||'';
+  document.getElementById('fb-test-result').style.display='none';
+  document.getElementById('fb-setup').classList.add('open');
+}
+function closeFbSetup(){ document.getElementById('fb-setup').classList.remove('open'); }
+
+async function testFbConnection(){
+  const url=document.getElementById('fb-url-inp').value.trim().replace(/\/$/,'');
+  if(!url){ showToast(currentLang==='en'?'Enter URL':'URL을 입력하세요','err'); return; }
+  const res=document.getElementById('fb-test-result');
+  res.style.display='block';
+  res.style.background='var(--bg4)'; res.style.color='var(--text3)';
+  res.textContent = currentLang==='en' ? '⏳ Testing connection...' : '⏳ 연결 테스트 중...';
+  try{
+    const r=await fetch(url+'/.json?shallow=true');
+    if(r.ok){
+      res.style.background='var(--greenbg)'; res.style.color='var(--green)';
+      res.textContent = currentLang==='en' ? '✅ Connected! Click Save to apply.' : '✅ 연결 성공! 저장 버튼을 눌러 적용하세요.';
+    } else {
+      res.style.background='var(--redbg)'; res.style.color='var(--red)';
+      res.textContent = currentLang==='en'
+        ? `❌ Failed (HTTP ${r.status}). Check URL and security rules.`
+        : `❌ 연결 실패 (HTTP ${r.status}). URL과 보안 규칙을 확인하세요.`;
+    }
+  } catch(e){
+    res.style.background='var(--redbg)'; res.style.color='var(--red)';
+    res.textContent='❌ '+(currentLang==='en'?'Connection failed: ':'연결 실패: ')+e.message;
+  }
+}
+
+async function saveFbConfig(){
+  const url = document.getElementById('fb-url-inp').value.trim().replace(/\/+$/, '');
+  if(!url){ showToast(currentLang==='en'?'Enter URL':'URL을 입력하세요','err'); return; }
+  FB_URL = url;
+  localStorage.setItem('vam_fb_url', url);
+  fbOnline = false;
+  if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  closeFbSetup();
+  showToast(currentLang==='en'?'Connecting to Firebase...':'Firebase 연결 중...', '');
+  await initFirebase();
+}
+
+// ══════════════════════════════════════
+//  SHARE / QR / ADMIN
+// ══════════════════════════════════════
+function showQR(){
+  const base = location.href.split('?')[0];
+  const url = FB_URL ? base + '?fburl=' + encodeURIComponent(FB_URL) : base;
+  const displayUrl = url.length > 80 ? url.slice(0,80)+'...' : url;
+  document.getElementById('qr-url').textContent = displayUrl;
+  document.getElementById('qr-url').title = url;
+
+  const canvas = document.getElementById('qr-canvas');
+  canvas.innerHTML = '';
+  const c = document.createElement('canvas');
+  canvas.appendChild(c);
+  if(typeof QRCode !== 'undefined'){
+    QRCode.toCanvas(c, url, {width:200, margin:2, color:{dark:'#e8eaf2',light:'#13161d'}}, err=>{
+      if(err) canvas.innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" style="border-radius:8px">`;
+    });
+  } else {
+    canvas.innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&color=e8eaf2&bgcolor=13161d" style="border-radius:8px">`;
+  }
+
+  const info = document.getElementById('qr-info');
+  if(info){
+    if(FB_URL){
+      info.innerHTML = currentLang==='en'
+        ? '<span style="color:var(--green)">✅ Firebase URL included — auto-connects on scan</span>'
+        : '<span style="color:var(--green)">✅ Firebase URL 포함 — QR 스캔 시 자동 연결됩니다</span>';
+    } else {
+      info.innerHTML = currentLang==='en'
+        ? '<span style="color:var(--yellow)">⚠️ No Firebase — manual setup required after scan</span>'
+        : '<span style="color:var(--yellow)">⚠️ Firebase 미설정 — 스캔 후 수동 연결 필요</span>';
+    }
+  }
+  document.getElementById('qr-mo').classList.add('open');
+}
+
+function copyQrUrl(){
+  const base = location.href.split('?')[0];
+  const url = FB_URL ? base + '?fburl=' + encodeURIComponent(FB_URL) : base;
+  try{ navigator.clipboard.writeText(url); showToast(currentLang==='en'?'URL copied 🔗':'URL 복사됨 🔗','ok'); }
+  catch{ prompt('URL:', url); }
+}
+
+function shareLink(k){
+  const a=alarms.find(x=>ak(x)===k); if(!a) return;
+  const u=new URL(location.href);
+  u.searchParams.set('v',a.vision); u.searchParams.set('t',a.type); u.searchParams.set('c',a.code);
+  try{ navigator.clipboard.writeText(u.toString()); showToast(currentLang==='en'?'Link copied 🔗':'링크 복사됨 🔗','ok'); }
+  catch{ prompt(currentLang==='en'?'Copy the link:':'링크를 복사하세요:', u.toString()); }
+}
+
+function toggleAdmin(){
+  const pw=isAdmin?'':prompt(currentLang==='en'?'Admin password:':'관리자 비밀번호:');
+  if(!isAdmin&&pw!=='admin1234'){ if(pw!==null) showToast(currentLang==='en'?'Wrong password':'비밀번호 오류','err'); return; }
+  isAdmin=!isAdmin;
+  const b=document.getElementById('role-b');
+  b.textContent=isAdmin?'ADMIN':'VIEWER';
+  b.style.background=isAdmin?'rgba(255,179,71,.15)':'var(--aglow)';
+  b.style.color=isAdmin?'var(--yellow)':'var(--accent)';
+  b.style.borderColor=isAdmin?'rgba(255,179,71,.3)':'rgba(79,124,255,.3)';
+  const vmb=document.getElementById('vision-manage-btn');
+  if(vmb) vmb.style.display=isAdmin?'block':'none';
+  if(isAdmin) checkTranslationStatus();
+  if(curAlarm) renderDetail(curAlarm);
+  showToast(isAdmin?t('admin_mode'):t('viewer_mode'),'ok');
+}
+
+async function checkTranslationStatus(){
+  if(!fbOnline) return;
+  try {
+    const status = await fbGet('translationStatus');
+    if(!status) return;
+    const pct = status.usage_pct || 0;
+    const warn = status.warning || false;
+    if(warn || pct >= 95){
+      showToast(`⚠️ DeepL ${pct}% — translation stopped`, 'err');
+      console.warn('[DeepL]', `Usage: ${pct}% (${(status.usage_count||0).toLocaleString()} / ${(status.usage_limit||500000).toLocaleString()})`);
+    } else if(pct >= 80){
+      showToast(`⚠️ DeepL ${pct}% — caution`, 'ok');
+    } else {
+      showToast(`🌐 DeepL ${pct}% used`, 'ok');
+    }
+  } catch(e) { /* silent fail */ }
+}
+
+// ══════════════════════════════════════
+//  ALARM ADD / EDIT / DELETE (Custom)
+// ══════════════════════════════════════
+function onNaTypeChange(){
+  const type = document.getElementById('na-type').value;
+  const isTrouble = type === 'Trouble';
+  document.getElementById('na-normal-fields').style.display = isTrouble ? 'none' : '';
+  document.getElementById('na-trouble-fields').style.display = isTrouble ? '' : 'none';
+}
+
+function renderSiteSelect(selId='na-site', selectedSite=''){
+  const el = document.getElementById(selId);
+  if(!el) return;
+  const placeholder = currentLang==='en' ? '-- Select --' : '-- 선택 --';
+  el.innerHTML = `<option value="">${placeholder}</option>`
+    + siteUnits.map(su=>`<option value="${su.site}"${su.site===selectedSite?' selected':''}>${su.site} (${su.units.length}${currentLang==='en'?' lines':'개'})</option>`).join('');
+}
+
+function renderUnitSelect(site, selId='na-unit', selectedUnit=''){
+  const el = document.getElementById(selId);
+  if(!el) return;
+  const su = siteUnits.find(x=>x.site===site);
+  if(!su || !su.units.length){
+    el.innerHTML = `<option value="">${currentLang==='en'?'-- No lines --':'-- 호기 없음 --'}</option>`;
+    return;
+  }
+  const placeholder = currentLang==='en' ? '-- Select --' : '-- 선택 --';
+  el.innerHTML = `<option value="">${placeholder}</option>`
+    + sortUnits(su.units).map(u=>`<option value="${u}"${u===selectedUnit?' selected':''}>${u}</option>`).join('');
+}
+
+function onNaSiteChange(){
+  const site = document.getElementById('na-site').value;
+  renderUnitSelect(site);
+  const hint = document.getElementById('na-site-hint');
+  if(hint){
+    const su = siteUnits.find(x=>x.site===site);
+    hint.textContent = su ? (currentLang==='en'?`${su.units.length} lines`:`호기 ${su.units.length}개`) : '';
+  }
+}
+
+function onNaSiteInput(el){ el.value = el.value.toUpperCase(); }
+function onNaUnitInput(el){ el.value = el.value.toUpperCase(); }
+
+function renderKeywordPreview(){
+  const val = document.getElementById('na-keywords').value;
+  const tags = val.split(',').map(s=>s.trim()).filter(Boolean);
+  document.getElementById('na-keyword-tags').innerHTML = tags.map(tg=>
+    `<span style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--text2)">${tg}</span>`
+  ).join('');
+}
+
+function openAddAlarmModal(){
+  document.getElementById('na-edit-id').value = '';
+  document.getElementById('add-alarm-mo-title').textContent = t('add_alarm_title');
+  document.getElementById('na-submit-btn').textContent = t('add_alarm_submit');
+  ['na-code','na-name','na-cause','na-occur','na-infl','na-related',
+   'na-site','na-unit','na-hour','na-min','na-keywords','na-desc'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('na-sev').value='Warning';
+  document.getElementById('na-sev-t').value='Warning';
+  document.getElementById('na-keyword-tags').innerHTML='';
+  document.getElementById('na-site-hint').textContent='';
+  document.getElementById('na-unit-hint').textContent='';
+  renderSiteSelect();
+  renderUnitSelect('');
+  renderVisionSelects();
+  onNaTypeChange();
+  document.getElementById('add-alarm-mo').classList.add('open');
+}
+
+function openEditAlarmModal(id){
+  const a = alarms.find(x=>x.id===id);
+  if(!a||!a.isCustom){ showToast(currentLang==='en'?'Cannot edit default alarms':'기본 알람은 수정할 수 없습니다','err'); return; }
+  document.getElementById('na-edit-id').value = id;
+  document.getElementById('add-alarm-mo-title').textContent = t('edit_alarm_title');
+  document.getElementById('na-submit-btn').textContent = t('edit_alarm_submit');
+  renderVisionSelects();
+  document.getElementById('na-vision').value = a.vision;
+  document.getElementById('na-type').value = a.type;
+  document.getElementById('na-code').value = a.code;
+  document.getElementById('na-name').value = a.name;
+  document.getElementById('na-cause').value = a.direct_cause||'';
+  document.getElementById('na-occur').value = a.occurrence||'';
+  document.getElementById('na-infl').value = a.influence||'';
+  document.getElementById('na-sev').value = a.severity||'Warning';
+  document.getElementById('na-related').value = a.related_alarms||'';
+  const editSite = a.tr_site||'';
+  const editUnit = a.tr_unit||'';
+  renderSiteSelect('na-site', editSite);
+  renderUnitSelect(editSite, 'na-unit', editUnit);
+  if(editSite){
+    const hint = document.getElementById('na-site-hint');
+    const su = siteUnits.find(x=>x.site===editSite);
+    if(hint && su) hint.textContent = currentLang==='en'?`${su.units.length} lines`:`호기 ${su.units.length}개`;
+  }
+  document.getElementById('na-hour').value = a.tr_hour||0;
+  document.getElementById('na-min').value = a.tr_min||0;
+  document.getElementById('na-keywords').value = (a.tr_keywords||[]).join(', ');
+  document.getElementById('na-desc').value = a.tr_desc||'';
+  document.getElementById('na-sev-t').value = a.severity||'Warning';
+  renderKeywordPreview();
+  onNaTypeChange();
+  document.getElementById('add-alarm-mo').classList.add('open');
+}
+
+async function submitAlarmModal(){
+  const editId = document.getElementById('na-edit-id').value;
+  if(editId) await saveEditAlarm(parseInt(editId));
+  else await addNewAlarm();
+}
+
+async function addNewAlarm(){
+  const vision = document.getElementById('na-vision').value;
+  const type   = document.getElementById('na-type').value;
+  const codeVal= document.getElementById('na-code').value.trim();
+  const name   = document.getElementById('na-name').value.trim();
+  const isTrouble = type === 'Trouble';
+
+  if(!name){ showToast(currentLang==='en'?'Enter alarm/issue name':'알람명/이슈명을 입력하세요','err'); return; }
+
+  let code = codeVal ? parseInt(codeVal) : null;
+  if(!code){
+    const existCodes = alarms.filter(a=>a.vision===vision&&a.type===type).map(a=>a.code);
+    code = Math.max(9000, ...existCodes.filter(c=>c>=9000).concat([9000])) + 1;
+  }
+  const dup = alarms.find(a=>a.vision===vision&&a.type===type&&a.code===code);
+  if(dup){ showToast(`${currentLang==='en'?'Duplicate code: ':'이미 존재하는 코드입니다: '}(${vision} ${type} C${code})`,'err'); return; }
+
+  const newId = Math.max(...alarms.map(a=>a.id).concat([0])) + 1;
+  const newAlarm = {
+    id:newId, vision, type, code, name,
+    direct_cause: isTrouble?'':document.getElementById('na-cause').value.trim(),
+    occurrence:   isTrouble?'':document.getElementById('na-occur').value.trim(),
+    influence:    isTrouble?'':document.getElementById('na-infl').value.trim(),
+    related_alarms: isTrouble?'':document.getElementById('na-related').value.trim(),
+    plc_output:'', timing:'', log:'',
+    severity: isTrouble ? document.getElementById('na-sev-t').value : document.getElementById('na-sev').value,
+    isCustom: true
+  };
+  if(isTrouble){
+    newAlarm.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
+    newAlarm.tr_unit     = document.getElementById('na-unit').value.trim().toUpperCase();
+    newAlarm.tr_hour     = parseInt(document.getElementById('na-hour').value)||0;
+    newAlarm.tr_min      = parseInt(document.getElementById('na-min').value)||0;
+    newAlarm.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    newAlarm.tr_desc     = document.getElementById('na-desc').value.trim();
+  }
+
+  customAlarms.push(newAlarm);
+  await saveCustomAlarms();
+  rebuildAlarms();
+  addAudit('알람 추가', ak(newAlarm), currentLang==='en'?'User':'사용자', '', name);
+  await saveAudit();
+  closeModal('add-alarm-mo');
+  applyFilters(); updateStats(); renderRight();
+  showToast(`${currentLang==='en'?'Added: ':'등록됨: '}${vision.replace('Vision','')} ${type} C${code}`, 'ok');
+  setTimeout(()=>selAlarm(newId), 200);
+}
+
+async function saveEditAlarm(id){
+  const idx = customAlarms.findIndex(a=>a.id===id);
+  if(idx<0){ showToast(currentLang==='en'?'Alarm not found':'수정할 알람을 찾을 수 없습니다','err'); return; }
+  const a = customAlarms[idx];
+  const isTrouble = document.getElementById('na-type').value === 'Trouble';
+
+  a.vision = document.getElementById('na-vision').value;
+  a.type   = document.getElementById('na-type').value;
+  a.name   = document.getElementById('na-name').value.trim();
+  a.severity = isTrouble ? document.getElementById('na-sev-t').value : document.getElementById('na-sev').value;
+  if(!isTrouble){
+    a.direct_cause    = document.getElementById('na-cause').value.trim();
+    a.occurrence      = document.getElementById('na-occur').value.trim();
+    a.influence       = document.getElementById('na-infl').value.trim();
+    a.related_alarms  = document.getElementById('na-related').value.trim();
+    delete a.tr_site; delete a.tr_unit; delete a.tr_hour; delete a.tr_min; delete a.tr_keywords; delete a.tr_desc;
+  } else {
+    a.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
+    a.tr_unit     = document.getElementById('na-unit').value.trim().toUpperCase();
+    a.tr_hour     = parseInt(document.getElementById('na-hour').value)||0;
+    a.tr_min      = parseInt(document.getElementById('na-min').value)||0;
+    a.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    a.tr_desc     = document.getElementById('na-desc').value.trim();
+  }
+
+  customAlarms[idx] = a;
+  await saveCustomAlarms();
+  rebuildAlarms();
+  addAudit('알람 수정', ak(a), currentLang==='en'?'User':'사용자', '', a.name);
+  await saveAudit();
+  closeModal('add-alarm-mo');
+  applyFilters(); updateStats(); renderRight();
+  if(curAlarm&&curAlarm.id===id){ const upd=alarms.find(x=>x.id===id); if(upd) renderDetail(upd); }
+  showToast(currentLang==='en'?'Alarm updated ✅':'알람 수정 완료 ✅', 'ok');
+}
+
+async function deleteCustomAlarm(id){
+  const a = alarms.find(x=>x.id===id);
+  if(!a||!a.isCustom){ showToast(currentLang==='en'?'Cannot delete default alarms':'기본 알람은 삭제할 수 없습니다','err'); return; }
+  const msg = currentLang==='en'
+    ? `Delete this alarm?\n\n${a.vision} ${a.type} C${a.code}\n${a.name}`
+    : `알람을 삭제하시겠습니까?\n\n${a.vision} ${a.type} C${a.code}\n${a.name}`;
+  if(!confirm(msg)){ return; }
+
+  customAlarms = customAlarms.filter(x=>x.id!==id);
+  await saveCustomAlarms();
+  rebuildAlarms();
+  const k=ak(a);
+  if(actions[k]){ delete actions[k]; await saveActions(); }
+  addAudit('알람 삭제', k, currentLang==='en'?'User':'사용자', a.name, '');
+  await saveAudit();
+  if(curAlarm&&curAlarm.id===id){
+    curAlarm=null;
+    const dp=document.getElementById('dp-content');
+    if(dp) dp.innerHTML=`<div class="empty-s"><div class="empty-ico">🔍</div><div>${currentLang==='en'?'Select an alarm':'알람을 선택하세요'}</div></div>`;
+  }
+  applyFilters(); updateStats(); renderRight();
+  showToast(currentLang==='en'?'Alarm deleted':'알람 삭제됨', 'ok');
+}
+
+// ══════════════════════════════════════
+//  VISION / TYPE / SITE MANAGE (Admin)
+// ══════════════════════════════════════
+let vmCurrentSite = '';
+
+function openVisionManage(){
+  if(!isAdmin){ showToast(currentLang==='en'?'Admin required':'Admin 권한이 필요합니다','err'); return; }
+  switchVmTab('vision');
+  document.getElementById('vision-manage-mo').classList.add('open');
+}
+
+function switchVmTab(tab){
+  ['vision','type','site'].forEach(tp=>{
+    document.getElementById(`vm-tab-${tp}`)?.classList.toggle('on', tp===tab);
+    const pane=document.getElementById(`vm-pane-${tp}`);
+    if(pane) pane.style.display = tp===tab?'':'none';
+  });
+  if(tab==='vision') renderVisionManageModal();
+  if(tab==='type')   renderTypeManageModal();
+  if(tab==='site')   renderSiteManageModal();
+}
+
+function renderVisionManageModal(){
+  const base=['NotchingVision','FoilVision','DelaminationVision','NGVision'];
+  const baseLabel = currentLang==='en' ? 'default' : '기본';
+  document.getElementById('vm-vision-list').innerHTML=[
+    ...base.map(v=>`<div class="vm-item"><span>${v}</span><span style="font-size:10px;color:var(--text3)">${baseLabel}</span></div>`),
+    ...customVisions.map((v,i)=>`<div class="vm-item"><span>${v}</span><button onclick="deleteCustomVision(${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`)
+  ].join('');
+}
+
+function renderTypeManageModal(){
+  const base=['HOST','Vision','Trouble'];
+  const baseLabel = currentLang==='en' ? 'default' : '기본';
+  document.getElementById('vm-type-list').innerHTML=[
+    ...base.map(tp=>`<div class="vm-item"><span>${tp}</span><span style="font-size:10px;color:var(--text3)">${baseLabel}</span></div>`),
+    ...customTypes.map((tp,i)=>`<div class="vm-item"><span>${tp}</span><button onclick="deleteCustomType(${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`)
+  ].join('');
+}
+
+function renderSiteManageModal(){
+  const noSite = currentLang==='en' ? 'No sites' : '사이트 없음';
+  const selectSite = currentLang==='en' ? '← Select a site' : '← 사이트를 선택하세요';
+  const noUnit = currentLang==='en' ? 'No lines' : '호기 없음';
+  const unitUnit = currentLang==='en' ? 'lines' : '개';
+
+  document.getElementById('vm-site-list').innerHTML=siteUnits.map((su,i)=>
+    `<div class="vm-item ${su.site===vmCurrentSite?'on':''}" style="${su.site===vmCurrentSite?'border-color:var(--accent);background:var(--bg4)':''}" onclick="selectVmSite('${su.site}')">
+      <span style="cursor:pointer;flex:1">${su.site}</span>
+      <span style="font-size:10px;color:var(--text3)">${su.units.length}${unitUnit}</span>
+      <button onclick="event.stopPropagation();deleteSite(${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-left:4px">🗑️</button>
+    </div>`
+  ).join('')||`<div style="font-size:11px;color:var(--text3)">${noSite}</div>`;
+
+  const suSel=siteUnits.find(x=>x.site===vmCurrentSite);
+  document.getElementById('vm-selected-site').textContent=vmCurrentSite?`— ${vmCurrentSite}`:'';
+  document.getElementById('vm-unit-add-row').style.display=vmCurrentSite?'flex':'none';
+  document.getElementById('vm-unit-list').innerHTML=vmCurrentSite
+    ? (suSel ? sortUnits(suSel.units).map((u,i)=>
+        `<div class="vm-item"><span>${u}</span><button onclick="deleteUnit('${vmCurrentSite}',${suSel.units.indexOf(u)})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`
+      ).join('')||`<div style="font-size:11px;color:var(--text3)">${noUnit}</div>` : '')
+    : `<div style="font-size:11px;color:var(--text3)">${selectSite}</div>`;
+}
+
+function selectVmSite(site){ vmCurrentSite=site; renderSiteManageModal(); }
+
+async function addCustomVision(){
+  const v=document.getElementById('vm-vision-inp').value.trim();
+  if(!v){ showToast(currentLang==='en'?'Enter Vision name':'Vision명을 입력하세요','err'); return; }
+  const base=['NotchingVision','FoilVision','DelaminationVision','NGVision'];
+  if([...base,...customVisions].includes(v)){ showToast(currentLang==='en'?'Already exists':'이미 존재합니다','err'); return; }
+  customVisions.push(v);
+  document.getElementById('vm-vision-inp').value='';
+  await saveCustomVisions(); renderVisionSelects(); renderVisionManageModal();
+  showToast(`${currentLang==='en'?'Vision added: ':'Vision 추가됨: '}${v}`,'ok');
+}
+
+async function deleteCustomVision(i){
+  if(!confirm(`"${customVisions[i]}" ${currentLang==='en'?'Vision — delete?':'Vision을 삭제하시겠습니까?'}`)) return;
+  customVisions.splice(i,1);
+  await saveCustomVisions(); renderVisionSelects(); renderVisionManageModal();
+  showToast(currentLang==='en'?'Vision deleted':'Vision 삭제됨','ok');
+}
+
+async function addCustomType(){
+  const tp=document.getElementById('vm-type-inp').value.trim();
+  if(!tp){ showToast(currentLang==='en'?'Enter type name':'타입명을 입력하세요','err'); return; }
+  const base=['HOST','Vision','Trouble'];
+  if([...base,...customTypes].includes(tp)){ showToast(currentLang==='en'?'Already exists':'이미 존재합니다','err'); return; }
+  customTypes.push(tp);
+  document.getElementById('vm-type-inp').value='';
+  await saveCustomTypes(); renderVisionSelects(); renderTypeManageModal();
+  showToast(`${currentLang==='en'?'Type added: ':'타입 추가됨: '}${tp}`,'ok');
+}
+
+async function deleteCustomType(i){
+  if(!confirm(`"${customTypes[i]}" ${currentLang==='en'?'— delete?':'타입을 삭제하시겠습니까?'}`)) return;
+  customTypes.splice(i,1);
+  await saveCustomTypes(); renderVisionSelects(); renderTypeManageModal();
+  showToast(currentLang==='en'?'Type deleted':'타입 삭제됨','ok');
+}
+
+async function addSite(){
+  const v=document.getElementById('vm-site-inp').value.trim().toUpperCase();
+  if(!v){ showToast(currentLang==='en'?'Enter site name':'사이트명을 입력하세요','err'); return; }
+  if(siteUnits.find(x=>x.site===v)){ showToast(currentLang==='en'?'Already exists':'이미 존재합니다','err'); return; }
+  siteUnits.push({site:v,units:[]}); vmCurrentSite=v;
+  document.getElementById('vm-site-inp').value='';
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`${currentLang==='en'?'Site added: ':'사이트 추가됨: '}${v}`,'ok');
+}
+
+async function deleteSite(i){
+  const s=siteUnits[i]; if(!s) return;
+  const msg = currentLang==='en'
+    ? `Delete site "${s.site}" with ${s.units.length} lines?`
+    : `"${s.site}" 사이트와 호기 ${s.units.length}개를 삭제하시겠습니까?`;
+  if(!confirm(msg)) return;
+  if(vmCurrentSite===s.site) vmCurrentSite='';
+  siteUnits.splice(i,1);
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`${currentLang==='en'?'Site deleted: ':'사이트 삭제됨: '}${s.site}`,'ok');
+}
+
+async function addUnit(){
+  if(!vmCurrentSite){ showToast(currentLang==='en'?'Select a site first':'사이트를 먼저 선택하세요','err'); return; }
+  const raw=document.getElementById('vm-unit-inp').value.trim();
+  if(!raw){ showToast(currentLang==='en'?'Enter line name':'호기명을 입력하세요','err'); return; }
+  const su=siteUnits.find(x=>x.site===vmCurrentSite); if(!su) return;
+  const added=raw.split(',').map(u=>u.trim()).filter(u=>u&&!su.units.includes(u));
+  if(!added.length){ showToast(currentLang==='en'?'Already exists or empty':'이미 존재하거나 빈 값입니다','err'); return; }
+  su.units.push(...added);
+  document.getElementById('vm-unit-inp').value='';
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`${currentLang==='en'?'Lines added: ':'호기 추가됨: '}${added.join(', ')}`,'ok');
+}
+
+async function deleteUnit(site,i){
+  const su=siteUnits.find(x=>x.site===site); if(!su) return;
+  const u=su.units[i];
+  const msg = currentLang==='en'
+    ? `Delete line "${site} - ${u}"?`
+    : `"${site} - ${u}" 호기를 삭제하시겠습니까?`;
+  if(!confirm(msg)) return;
+  su.units.splice(i,1);
+  await saveSiteUnits(); renderSiteManageModal();
+  showToast(`${currentLang==='en'?'Line deleted: ':'호기 삭제됨: '}${u}`,'ok');
+}
+
+// ══════════════════════════════════════
+//  UPLOAD
+// ══════════════════════════════════════
+function handleUpload(event){
+  const files=Array.from(event.target.files);
+  const status=document.getElementById('up-status');
+  if(!files.length) return;
+  status.innerHTML=`<span class="spin"></span> ${currentLang==='en'?'Parsing...':'파싱 중...'}`;
+  let done=0, added=0;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        if(typeof XLSX==='undefined') throw new Error(currentLang==='en'?'SheetJS not loaded':'SheetJS 미로드');
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        const fname=file.name.replace(/\.xlsx$/i,'').split('_');
+        const vision=fname[0]||'Unknown', type=fname[1]||'HOST';
+        let hr=-1;
+        data.forEach((row,i)=>{ if(String(row[0]).toLowerCase().includes('code')) hr=i; });
+        if(hr<0){ done++; check(); return; }
+        data.slice(hr+1).forEach(row=>{
+          const code=parseInt(row[0]); if(isNaN(code)) return;
+          if(alarms.find(a=>ak(a)===vision+'_'+type+'_'+code)) return;
+          const newId=Math.max(...alarms.map(a=>a.id))+1;
+          alarms.push({id:newId,vision,type,code,name:String(row[1]||''),
+            direct_cause:String(row[2]||''),occurrence:String(row[3]||''),
+            influence:String(row[4]||''),related_alarms:String(row[5]||''),
+            plc_output:String(row[6]||''),timing:String(row[7]||''),
+            log:String(row[8]||''),severity:'Info'});
+          added++;
+        });
+        done++; check();
+      } catch(err){ status.innerHTML=`❌ ${file.name}: ${err.message}`; done++; check(); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+  function check(){
+    if(done<files.length) return;
+    status.innerHTML = currentLang==='en'
+      ? `✅ ${files.length} file(s), ${added} new entries added`
+      : `✅ ${files.length}개 파일, 신규 ${added}건 추가`;
+    addAudit('Excel 업로드',files.map(f=>f.name).join(','),'User','',`+${added}건`);
+    applyFilters(); updateStats(); renderRight();
+    showToast(`${added}${t('added')}`,'ok');
+  }
+}
