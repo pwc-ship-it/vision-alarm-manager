@@ -9,8 +9,12 @@ function showEF(k){
   const a=alarms.find(x=>ak(x)===k); if(!a) return;
   const g=ga(a);
   const lbl = currentLang==='en'
-    ? {name:'Alarm Name',sev:'Severity',cause:'Direct Cause',occ:'Occurrence',inf:'Influence',rel:'Related Alarms',plc:'PLC Output',save:'Save',cancel:'Cancel',mode:'✏️ Admin Edit Mode'}
-    : {name:'알람명',sev:'심각도',cause:'직접 원인',occ:'발생 조건',inf:'영향 조건',rel:'관련 알람',plc:'PLC 출력',save:'저장',cancel:'취소',mode:'✏️ 관리자 수정 모드'};
+    ? {name:'Alarm Name',sev:'Severity',cause:'Direct Cause',occ:'Occurrence',inf:'Influence',rel:'Related Alarms',plc:'PLC Output',date:'Registered',save:'Save',cancel:'Cancel',mode:'✏️ Admin Edit Mode'}
+    : {name:'알람명',sev:'심각도',cause:'직접 원인',occ:'발생 조건',inf:'영향 조건',rel:'관련 알람',plc:'PLC 출력',date:'등록일',save:'저장',cancel:'취소',mode:'✏️ 관리자 수정 모드'};
+  const dateField = a.isCustom ? `<div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+    <label style="font-size:10px;color:var(--text3);white-space:nowrap;margin:0">${lbl.date}</label>
+    <input type="date" id="ef-date" value="${(g.created_date||'').slice(0,10)}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:4px 8px;flex:1">
+  </div>` : '';
   document.getElementById('ef-area').innerHTML=`
     <div class="ef">
       <div style="font-size:11px;font-weight:500;color:var(--yellow);margin-bottom:4px">${lbl.mode}</div>
@@ -29,6 +33,7 @@ function showEF(k){
       <label>${lbl.inf}</label><textarea id="ef-inf" rows="2">${esc(g.influence)}</textarea>
       <label>${lbl.rel}</label><textarea id="ef-rel" rows="1">${esc(g.related_alarms)}</textarea>
       <label>${lbl.plc}</label><textarea id="ef-plc" rows="1">${esc(g.plc_output)}</textarea>
+      ${dateField}
       <div style="display:flex;gap:6px;margin-top:3px">
         <button class="btn primary sm" onclick="saveEdit('${k}')">${lbl.save}</button>
         <button class="btn sm" onclick="document.getElementById('ef-area').innerHTML=''">${lbl.cancel}</button>
@@ -48,6 +53,15 @@ async function saveEdit(k){
     related_alarms:document.getElementById('ef-rel').value.trim(),
     plc_output:document.getElementById('ef-plc').value.trim()
   };
+  // isCustom 알람이면 등록일도 저장
+  const dateEl = document.getElementById('ef-date');
+  if(a.isCustom && dateEl && dateEl.value){
+    nd.created_date = dateEl.value;
+    // customAlarms에도 반영
+    const ci = customAlarms.findIndex(x=>x.id===a.id);
+    if(ci>=0) customAlarms[ci].created_date = dateEl.value;
+    await saveCustomAlarms();
+  }
   const before=JSON.stringify({name:g.name,severity:g.severity});
   if(!alarmEdits[k]) alarmEdits[k]={};
   Object.assign(alarmEdits[k],nd);
