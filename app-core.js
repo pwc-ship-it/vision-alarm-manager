@@ -264,6 +264,7 @@ const I18N = {
     tr_time:            '조치 시간',
     tr_keywords:        '키워드',
     tr_desc:            '발생 현상',
+    reg_date:           '등록일',
     // 기타
     loading:            '로딩 중...',
     no_result:          '검색 결과가 없습니다',
@@ -417,6 +418,7 @@ const I18N = {
     tr_time:            'Resolution Time',
     tr_keywords:        'Keywords',
     tr_desc:            'Description',
+    reg_date:           'Registered',
     // 기타
     loading:            'Loading...',
     no_result:          'No results found',
