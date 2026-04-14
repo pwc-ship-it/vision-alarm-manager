@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>INTEKPLUS ALARM Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260409c">
+  <link rel="stylesheet" href="style.css?v=20260409d">
 </head>
 <body>
 <div id="app">
@@ -404,6 +404,11 @@
     </div>
 
     <div class="md-a">
+      <!-- 등록일 필드 (공통) -->
+      <div style="display:flex;align-items:center;gap:8px;width:100%;margin-bottom:8px">
+        <label style="font-size:10px;color:var(--text3);white-space:nowrap" data-i18n="reg_date">등록일</label>
+        <input type="date" id="na-created-date" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:4px 8px;flex:1">
+      </div>
       <button class="btn primary" id="na-submit-btn" onclick="submitAlarmModal()" data-i18n="add_alarm_submit">➕ 등록</button>
       <button class="btn" onclick="closeModal('add-alarm-mo')" data-i18n="cancel">취소</button>
     </div>
@@ -478,15 +483,15 @@
 
 <div id="toast"></div>
 
-<script src="alarms.js?v=20260409c"></script>
-<script src="alarms_en.js?v=20260409c"></script>
+<script src="alarms.js?v=20260409d"></script>
+<script src="alarms_en.js?v=20260409d"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<script src="app-core.js?v=20260409c"></script>
-<script src="app-render.js?v=20260409c"></script>
-<script src="app-actions.js?v=20260409c"></script>
-<script src="app-admin.js?v=20260409c"></script>
-<script src="app-ui.js?v=20260409c"></script>
-<script src="app-init.js?v=20260409c"></script>
+<script src="app-core.js?v=20260409d"></script>
+<script src="app-render.js?v=20260409d"></script>
+<script src="app-actions.js?v=20260409d"></script>
+<script src="app-admin.js?v=20260409d"></script>
+<script src="app-ui.js?v=20260409d"></script>
+<script src="app-init.js?v=20260409d"></script>
 </body>
 </html>
