@@ -221,6 +221,9 @@ function openAddAlarmModal(){
   document.getElementById('na-keyword-tags').innerHTML='';
   document.getElementById('na-site-hint').textContent='';
   document.getElementById('na-unit-hint').textContent='';
+  // 등록일 오늘 날짜 디폴트
+  const dateEl=document.getElementById('na-created-date');
+  if(dateEl) dateEl.value=new Date().toISOString().slice(0,10);
   renderSiteSelect();
   renderUnitSelect('');
   renderVisionSelects();
@@ -258,6 +261,14 @@ function openEditAlarmModal(id){
   document.getElementById('na-keywords').value = (a.tr_keywords||[]).join(', ');
   document.getElementById('na-desc').value = a.tr_desc||'';
   document.getElementById('na-sev-t').value = a.severity||'Warning';
+  // 등록일: 기존값 표시 (Admin만 수정 가능)
+  const dateEl=document.getElementById('na-created-date');
+  if(dateEl){
+    dateEl.value = a.created_date||'';
+    dateEl.readOnly = !isAdmin;
+    dateEl.style.opacity = isAdmin ? '1' : '0.5';
+    dateEl.title = isAdmin ? '' : (currentLang==='en'?'Admin only':'관리자만 수정 가능');
+  }
   renderKeywordPreview();
   onNaTypeChange();
   document.getElementById('add-alarm-mo').classList.add('open');
@@ -287,6 +298,7 @@ async function addNewAlarm(){
   if(dup){ showToast(`${currentLang==='en'?'Duplicate code: ':'이미 존재하는 코드입니다: '}(${vision} ${type} C${code})`,'err'); return; }
 
   const newId = Math.max(...alarms.map(a=>a.id).concat([0])) + 1;
+  const createdDate = document.getElementById('na-created-date')?.value || new Date().toISOString().slice(0,10);
   const newAlarm = {
     id:newId, vision, type, code, name,
     direct_cause: isTrouble?'':document.getElementById('na-cause').value.trim(),
@@ -295,7 +307,8 @@ async function addNewAlarm(){
     related_alarms: isTrouble?'':document.getElementById('na-related').value.trim(),
     plc_output:'', timing:'', log:'',
     severity: isTrouble ? document.getElementById('na-sev-t').value : document.getElementById('na-sev').value,
-    isCustom: true
+    isCustom: true,
+    created_date: createdDate
   };
   if(isTrouble){
     newAlarm.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
@@ -327,6 +340,11 @@ async function saveEditAlarm(id){
   a.type   = document.getElementById('na-type').value;
   a.name   = document.getElementById('na-name').value.trim();
   a.severity = isTrouble ? document.getElementById('na-sev-t').value : document.getElementById('na-sev').value;
+  // Admin만 등록일 수정 가능
+  if(isAdmin){
+    const dateVal = document.getElementById('na-created-date')?.value;
+    if(dateVal) a.created_date = dateVal;
+  }
   if(!isTrouble){
     a.direct_cause    = document.getElementById('na-cause').value.trim();
     a.occurrence      = document.getElementById('na-occur').value.trim();
