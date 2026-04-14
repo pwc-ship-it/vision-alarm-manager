@@ -297,7 +297,7 @@ function renderDetail(a){
       <div class="dpt">${enText(g.name)}</div>
       <div class="dpa">
         <button class="btn sm ${isFav?'':'primary'}" onclick="toggleFav('${k}')">${isFav?t('fav_remove'):t('fav_add')}</button>
-        ${isAdmin?`<button class="btn sm" onclick="showEF('${k}')">✏️ ${currentLang==='en'?'Edit Alarm Info':'알람정보 수정'}</button>`:''}
+        ${isAdmin&&a.type!=='Trouble'?`<button class="btn sm" onclick="showEF('${k}')">✏️ ${currentLang==='en'?'Edit Alarm Info':'알람정보 수정'}</button>`:''}
         ${a.isCustom?`<button class="btn sm" onclick="openEditAlarmModal(${a.id})" style="background:var(--bg4);border-color:var(--yellow);color:var(--yellow)">${t('alarm_edit')}</button>`:''}
         ${a.isCustom?`<button class="btn sm" onclick="deleteCustomAlarm(${a.id})" style="background:var(--redbg);border-color:var(--red);color:var(--red)">${t('alarm_delete')}</button>`:''}
         <button class="btn sm" onclick="shareLink('${k}')">${t('share')}</button>
