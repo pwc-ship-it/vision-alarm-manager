@@ -72,7 +72,11 @@ function startPolling(){
       if(caData && typeof caData === 'object'){
         const arr = Array.isArray(caData) ? caData : Object.values(caData);
         if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(customAlarms)){
-          customAlarms=arr; sS('vam_custom_alarms',customAlarms); rebuildAlarms(); changed=true;
+          customAlarms=arr; sS('vam_custom_alarms',customAlarms);
+          rebuildAlarms();
+          // curAlarm 참조 갱신
+          if(curAlarm){ const upd=alarms.find(x=>x.id===curAlarm.id); if(upd) curAlarm=upd; }
+          changed=true;
         }
       }
       if(cvData && typeof cvData === 'object'){
@@ -95,7 +99,11 @@ function startPolling(){
       }
       if(changed){
         renderRight();
-        if(curAlarm) renderDetail(curAlarm);
+        if(curAlarm){
+          // changed 후 curAlarm 참조 최신화
+          const upd=alarms.find(x=>x.id===curAlarm.id); if(upd) curAlarm=upd;
+          renderDetail(curAlarm);
+        }
         if(allActOpen) renderAllActions();
         renderList(document.getElementById('srch').value);
         updateStats();
@@ -159,6 +167,8 @@ async function initFirebase(){
     }
 
     rebuildAlarms();
+    // curAlarm이 있으면 새 alarms 배열 기준으로 참조 갱신
+    if(curAlarm){ const upd=alarms.find(x=>x.id===curAlarm.id); if(upd) curAlarm=upd; }
     console.log('[Firebase] 로드 완료 - actions:', Object.keys(actions).length, '개');
     startPolling();
     showToast('Firebase 연결됨 ✅', 'ok');
