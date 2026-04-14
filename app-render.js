@@ -21,23 +21,49 @@ async function saveActionKey(k){
 }
 
 async function saveCustomAlarms(){
+  // ★ PUT(fbSet) 사용: 배열을 완전 교체. PATCH는 이전 인덱스가 Firebase에 남아 데이터 오염/손실 발생
+  // ★ 빈 배열이면 null 대신 fbDelete로 노드 삭제 — null PATCH는 기존 모든 데이터를 삭제하는 위험 동작
   sS('vam_custom_alarms', customAlarms);
-  if(fbOnline) await fbPatch('customAlarms', customAlarms.length ? customAlarms : null);
+  if(fbOnline){
+    if(customAlarms.length > 0){
+      await fbSet('customAlarms', customAlarms);
+    } else {
+      await fbDelete('customAlarms');
+    }
+  }
 }
 
 async function saveCustomVisions(){
   sS('vam_custom_visions', customVisions);
-  if(fbOnline) await fbPatch('customVisions', customVisions.length ? customVisions : null);
+  if(fbOnline){
+    if(customVisions.length > 0){
+      await fbSet('customVisions', customVisions);
+    } else {
+      await fbDelete('customVisions');
+    }
+  }
 }
 
 async function saveCustomTypes(){
   sS('vam_custom_types', customTypes);
-  if(fbOnline) await fbPatch('customTypes', customTypes.length ? customTypes : null);
+  if(fbOnline){
+    if(customTypes.length > 0){
+      await fbSet('customTypes', customTypes);
+    } else {
+      await fbDelete('customTypes');
+    }
+  }
 }
 
 async function saveSiteUnits(){
   sS('vam_site_units', siteUnits);
-  if(fbOnline) await fbPatch('siteUnits', siteUnits.length ? siteUnits : null);
+  if(fbOnline){
+    if(siteUnits.length > 0){
+      await fbSet('siteUnits', siteUnits);
+    } else {
+      await fbDelete('siteUnits');
+    }
+  }
 }
 
 async function saveAlarmEdits(){
@@ -72,8 +98,15 @@ function updateStats(){
 //  FILTERS & LIST
 // ══════════════════════════════════════
 function applyFilters(){
-  const v  = document.getElementById('sel-v').value;
-  const tp = document.getElementById('sel-t').value;
+  // 모바일 필터 시트가 열려있을 경우 m-v / m-t 값을 우선 사용
+  const mobV = document.getElementById('m-v');
+  const mobT = document.getElementById('m-t');
+  const v  = (mobV && document.getElementById('mob-sheet').style.display==='flex')
+             ? mobV.value
+             : document.getElementById('sel-v').value;
+  const tp = (mobT && document.getElementById('mob-sheet').style.display==='flex')
+             ? mobT.value
+             : document.getElementById('sel-t').value;
   const raw = (document.getElementById('srch').value||'').trim().replace(/\s+/g,' ').toLowerCase();
   const qTerms = raw ? raw.split(' ').filter(Boolean) : [];
   const sort=document.getElementById('sort-sel').value;
@@ -297,7 +330,7 @@ function renderDetail(a){
       <div class="dpt">${enText(g.name)}</div>
       <div class="dpa">
         <button class="btn sm ${isFav?'':'primary'}" onclick="toggleFav('${k}')">${isFav?t('fav_remove'):t('fav_add')}</button>
-        ${isAdmin&&a.type!=='Trouble'?`<button class="btn sm" onclick="showEF('${k}')">✏️ ${currentLang==='en'?'Edit Alarm Info':'알람정보 수정'}</button>`:''}
+        ${isAdmin?`<button class="btn sm" onclick="showEF('${k}')">✏️ ${currentLang==='en'?'Edit Alarm Info':'알람정보 수정'}</button>`:''}
         ${a.isCustom?`<button class="btn sm" onclick="openEditAlarmModal(${a.id})" style="background:var(--bg4);border-color:var(--yellow);color:var(--yellow)">${t('alarm_edit')}</button>`:''}
         ${a.isCustom?`<button class="btn sm" onclick="deleteCustomAlarm(${a.id})" style="background:var(--redbg);border-color:var(--red);color:var(--red)">${t('alarm_delete')}</button>`:''}
         <button class="btn sm" onclick="shareLink('${k}')">${t('share')}</button>
@@ -313,7 +346,6 @@ function renderDetail(a){
           ${g.tr_site?`<div class="ic"><div class="icl">${t('tr_site')}</div><div class="icv">${esc(g.tr_site)}</div></div>`:''}
           ${g.tr_unit?`<div class="ic"><div class="icl">${t('tr_unit')}</div><div class="icv">${esc(g.tr_unit)}</div></div>`:''}
           <div class="ic"><div class="icl">${t('resolution_time')}</div><div class="icv">${(g.tr_hour||0)+t('hour')+' '+(g.tr_min||0)+t('minute')}</div></div>
-          ${g.created_date?`<div class="ic"><div class="icl">${t('reg_date')}</div><div class="icv">${esc(g.created_date)}</div></div>`:''}
           ${g.tr_keywords&&g.tr_keywords.length?`<div class="ic f"><div class="icl">${t('tr_keywords')}</div><div class="icv">${g.tr_keywords.map(kw=>`<span style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:11px;margin-right:3px">${esc(kw)}</span>`).join('')}</div></div>`:''}
           ${g.tr_desc?`<div class="ic f"><div class="icl">${t('tr_desc')}</div><div class="icv">${enText(g.tr_desc)}</div></div>`:''}
           ${g.direct_cause?`<div class="ic f"><div class="icl">${t('direct_cause')}</div><div class="icv">${enText(g.direct_cause)}</div></div>`:''}
@@ -326,7 +358,6 @@ function renderDetail(a){
           <div class="ic"><div class="icl">${t('timing')}</div><div class="icv">${enText(g.timing)||'-'}</div></div>
           <div class="ic f"><div class="icl">${t('plc_output')}</div><div class="icv mn">${enText(g.plc_output)||'-'}</div></div>
           <div class="ic f"><div class="icl">${t('related_log')}</div><div class="icv mn" style="font-size:11px">${enText(g.log)||'-'}</div></div>
-          ${g.isCustom&&g.created_date?`<div class="ic"><div class="icl">${t('reg_date')}</div><div class="icv">${esc(g.created_date)}</div></div>`:''}
         </div>`}
         </div>
       </div>
@@ -353,10 +384,6 @@ function renderDetail(a){
           </div>
           <textarea id="ac-txt" placeholder="${t('action_placeholder')}" rows="4"></textarea>
           <input type="text" id="ac-link" placeholder="${t('ref_link')}" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%">
-          <div class="fr" style="align-items:center;gap:6px;margin-top:4px">
-            <label style="font-size:10px;color:var(--text3);white-space:nowrap">${t('reg_date')}</label>
-            <input type="date" id="ac-date" value="${new Date().toISOString().slice(0,10)}" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:4px 8px;flex:1">
-          </div>
           <div class="fr" style="align-items:center">
             <select id="ac-st">
               <option value="">${t('status_unset')}</option>
@@ -383,14 +410,12 @@ function actCard(ac,k,i,allActs){
   // ac.text_en: EN 모드에서 DeepL 번역본이 있으면 사용
   const displayText = (currentLang==='en' && ac.text_en) ? ac.text_en : ac.text;
   const linkHtml=ac.link?`<a href="${esc(ac.link)}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent);display:inline-flex;align-items:center;gap:3px;margin-top:5px;text-decoration:none;background:var(--aglow);padding:2px 8px;border-radius:4px;border:1px solid rgba(79,124,255,.2)">${t('ref_link_open')}</a>`:'';
-  const dateDisplay = ac.date || (currentLang==='en'?'(no date)':'(날짜 미기록)');
-  const editedBadge = ac.edited ? `<span style="font-size:9px;color:var(--text3);margin-left:2px">(${currentLang==='en'?'edited':'수정됨'})</span>` : '';
   return `<div class="ac${best?' best':''}" id="ac-${k}-${i}">
     ${best?`<span class="best-b">★ Best</span>`:''}
     <div class="ac-meta">
       <span class="ac-auth">${esc(ac.author)}</span>
       ${ac.site?`<span class="ac-site">· ${esc(ac.site)}</span>`:''}
-      <span>${dateDisplay}${editedBadge}</span>
+      <span>${ac.date}</span>
       <span style="margin-left:auto;display:flex;gap:4px">
         <button onclick="showEditAction('${k}',${i})" style="background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="${t('edit')}">${t('edit')}</button>
         ${isAdmin?`<button onclick="deleteAction('${k}',${i})" style="background:none;border:1px solid rgba(255,77,106,.3);border-radius:4px;color:var(--red);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="${t('delete_admin')}">${t('delete_admin')}</button>`:''}
@@ -417,10 +442,6 @@ function showEditAction(k,idx){
     <div style="font-size:10px;color:var(--yellow);font-weight:500">${t('action_edit_title')}</div>
     <textarea id="ea-txt-${k}-${idx}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:7px;width:100%;min-height:80px;resize:vertical" >${esc(ac.text)}</textarea>
     <input type="text" id="ea-link-${k}-${idx}" placeholder="${t('ref_link')}" value="${esc(ac.link||'')}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%">
-    ${isAdmin?`<div style="display:flex;align-items:center;gap:6px">
-      <label style="font-size:10px;color:var(--text3);white-space:nowrap">${t('reg_date')}</label>
-      <input type="date" id="ea-date-${k}-${idx}" value="${(ac.date||'').slice(0,10)}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:4px 8px;flex:1">
-    </div>`:''}
     <div style="display:flex;gap:5px;align-items:center">
       <select id="ea-st-${k}-${idx}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:5px 8px;flex:1">
         <option value="" ${!ac.status?'selected':''}>${t('status_unset')}</option>
@@ -440,15 +461,9 @@ async function saveEditAction(k,idx){
   const txt=document.getElementById(`ea-txt-${k}-${idx}`)?.value.trim();
   const lnk=document.getElementById(`ea-link-${k}-${idx}`)?.value.trim();
   const st=document.getElementById(`ea-st-${k}-${idx}`)?.value;
-  const dateVal=document.getElementById(`ea-date-${k}-${idx}`)?.value;
   if(!txt||txt.length<5){ showToast(currentLang==='en'?'Enter at least 5 characters':'5자 이상 입력하세요','err'); return; }
   const before=ac.text.slice(0,60);
   ac.text=txt; ac.link=lnk; ac.status=st;
-  // Admin은 날짜 직접 수정 가능
-  if(isAdmin && dateVal){
-    const timePart=(ac.date||'').slice(11,16)||'00:00';
-    ac.date=dateVal+' '+timePart;
-  }
   ac.edited=new Date().toISOString().slice(0,16).replace('T',' ');
   await saveActions();
   addAudit('조치방안 수정',k,ac.author,before,txt.slice(0,60));
@@ -517,7 +532,6 @@ async function addAction(k){
   const text=document.getElementById('ac-txt').value.trim();
   const status=document.getElementById('ac-st').value;
   const link=(document.getElementById('ac-link')?.value||'').trim();
-  const dateInput=(document.getElementById('ac-date')?.value||'').trim();
   if(!author){ showToast(currentLang==='en'?'Enter your name':'이름을 입력하세요','err'); return; }
   if(text.length<5){ showToast(currentLang==='en'?'Enter at least 5 characters':'5자 이상 입력하세요','err'); return; }
   const btn=document.getElementById('ac-submit-btn');
@@ -525,10 +539,8 @@ async function addAction(k){
   sS('vam_author',author); sS('vam_site',site);
   savedAuthor=author; savedSite=site;
   if(!actions[k]) actions[k]=[];
-  // 날짜: 사용자 입력 우선, 없으면 현재 시각
   const now=new Date();
-  const timeStr=now.toTimeString().slice(0,5);
-  const dateStr=dateInput ? dateInput+' '+timeStr : now.toISOString().slice(0,10)+' '+timeStr;
+  const dateStr=now.toISOString().slice(0,10)+' '+now.toTimeString().slice(0,5);
   const entry={author,site,text,date:dateStr,status,helpful:0};
   if(link) entry.link=link;
   actions[k].push(entry);
