@@ -35,6 +35,19 @@ async function fbPatch(path, data){
   } catch(e){ console.error('fbPatch error:', e); return false; }
 }
 
+async function fbSet(path, data){
+  // PUT = 완전 교체 (배열 저장 시 반드시 사용 — PATCH는 이전 인덱스가 남아 데이터 손상)
+  if(!FB_URL) return false;
+  try{
+    const r = await fetch(fbPath(path), {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    return r.ok;
+  } catch(e){ console.error('fbSet error:', e); return false; }
+}
+
 async function fbDelete(path){
   if(!FB_URL) return false;
   try{
@@ -68,9 +81,9 @@ function startPolling(){
           auditLog = newAudit; changed = true;
         }
       }
-      // Firebase 배열→객체 변환 대응 (빈 데이터는 무시)
+      // Firebase 배열→객체 변환 대응 (빈 데이터는 무시 — 폴링이 빈값으로 로컬 데이터 덮어씌우는 것 방지)
       if(caData && typeof caData === 'object'){
-        const arr = Array.isArray(caData) ? caData : Object.values(caData);
+        const arr = Array.isArray(caData) ? caData : Object.values(caData).filter(x=>x&&typeof x==='object');
         if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(customAlarms)){
           customAlarms=arr; sS('vam_custom_alarms',customAlarms);
           rebuildAlarms();
@@ -80,19 +93,19 @@ function startPolling(){
         }
       }
       if(cvData && typeof cvData === 'object'){
-        const arr = Array.isArray(cvData) ? cvData : Object.values(cvData);
+        const arr = Array.isArray(cvData) ? cvData : Object.values(cvData).filter(Boolean);
         if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(customVisions)){
           customVisions=arr; sS('vam_custom_visions',customVisions); renderVisionSelects(); changed=true;
         }
       }
       if(ctData && typeof ctData === 'object'){
-        const arr = Array.isArray(ctData) ? ctData : Object.values(ctData);
+        const arr = Array.isArray(ctData) ? ctData : Object.values(ctData).filter(Boolean);
         if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(customTypes)){
           customTypes=arr; sS('vam_custom_types',customTypes); renderVisionSelects(); changed=true;
         }
       }
       if(suData && typeof suData === 'object'){
-        const arr = Array.isArray(suData) ? suData : Object.values(suData);
+        const arr = Array.isArray(suData) ? suData : Object.values(suData).filter(x=>x&&typeof x==='object');
         if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(siteUnits)){
           siteUnits=arr; sS('vam_site_units',siteUnits); changed=true;
         }
@@ -125,8 +138,9 @@ async function initFirebase(){
       fbOnline = false; setDbStatus('offline');
       applyFilters(); updateStats(); renderRight(); return;
     }
-    fbOnline = true;
-    setDbStatus('online');
+    // ★ fbOnline은 데이터 로드 완료 후 설정 (Race Condition 방지)
+    //    이전: fbOnline=true → await Promise.all() → 위험 구간에서 저장 함수 호출 시 빈 데이터로 Firebase 덮어씀
+    setDbStatus('loading');
     console.log('[Firebase] 연결 성공! 데이터 로드 중...');
 
     const [actData, editData, auditData, caData, cvData, ctData, suData] = await Promise.all([
@@ -139,26 +153,27 @@ async function initFirebase(){
       fbGet('siteUnits')
     ]);
 
+    // ── 데이터 로드 완료 후 메모리에 안전하게 반영 ──
     if(actData && typeof actData === 'object') actions = actData;
     if(editData && typeof editData === 'object') alarmEdits = editData;
     if(auditData && typeof auditData === 'object') auditLog = Array.isArray(auditData) ? auditData : Object.values(auditData);
     // Firebase는 배열을 객체({0:{...},1:{...}})로 저장하는 경우가 있으므로 양쪽 처리
     if(caData && typeof caData === 'object'){
-      const arr = Array.isArray(caData) ? caData : Object.values(caData);
+      const arr = Array.isArray(caData) ? caData : Object.values(caData).filter(x=>x&&typeof x==='object');
       if(arr.length){ customAlarms = arr; sS('vam_custom_alarms', customAlarms); }
     }
     if(cvData && typeof cvData === 'object'){
-      const arr = Array.isArray(cvData) ? cvData : Object.values(cvData);
+      const arr = Array.isArray(cvData) ? cvData : Object.values(cvData).filter(Boolean);
       if(arr.length){ customVisions = arr; sS('vam_custom_visions', customVisions); }
     }
     if(ctData && typeof ctData === 'object'){
-      const arr = Array.isArray(ctData) ? ctData : Object.values(ctData);
+      const arr = Array.isArray(ctData) ? ctData : Object.values(ctData).filter(Boolean);
       if(arr.length){ customTypes = arr; sS('vam_custom_types', customTypes); }
     }
     // siteUnits: Firebase 데이터가 실제로 있을 때만 덮어씀
     // 빈 객체({}) 또는 null이면 DEFAULT_SITE_UNITS 유지
     if(suData && typeof suData === 'object'){
-      const arr = Array.isArray(suData) ? suData : Object.values(suData);
+      const arr = Array.isArray(suData) ? suData : Object.values(suData).filter(x=>x&&typeof x==='object');
       if(arr.length > 0){
         siteUnits = arr;
         sS('vam_site_units', siteUnits);
@@ -166,10 +181,17 @@ async function initFirebase(){
       // arr.length === 0 이면 기존 siteUnits(DEFAULT) 그대로 유지
     }
 
+    // ★ 모든 데이터가 메모리에 안전하게 로드된 후 fbOnline = true 설정
+    fbOnline = true;
+    setDbStatus('online');
+
     rebuildAlarms();
-    // curAlarm이 있으면 새 alarms 배열 기준으로 참조 갱신
-    if(curAlarm){ const upd=alarms.find(x=>x.id===curAlarm.id); if(upd) curAlarm=upd; }
-    console.log('[Firebase] 로드 완료 - actions:', Object.keys(actions).length, '개');
+    // curAlarm이 있으면 새 alarms 배열 기준으로 참조 갱신 + 상세 패널 재렌더링 (Bug 1 수정)
+    if(curAlarm){
+      const upd = alarms.find(x=>x.id===curAlarm.id);
+      if(upd){ curAlarm = upd; renderDetail(curAlarm); }
+    }
+    console.log('[Firebase] 로드 완료 - actions:', Object.keys(actions).length, '개, customAlarms:', customAlarms.length, '개');
     startPolling();
     showToast('Firebase 연결됨 ✅', 'ok');
   } catch(e){
