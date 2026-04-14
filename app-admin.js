@@ -234,21 +234,22 @@ function openAddAlarmModal(){
 function openEditAlarmModal(id){
   const a = alarms.find(x=>x.id===id);
   if(!a||!a.isCustom){ showToast(currentLang==='en'?'Cannot edit default alarms':'기본 알람은 수정할 수 없습니다','err'); return; }
+  const g = ga(a); // alarmEdits 반영된 최신 값 사용
   document.getElementById('na-edit-id').value = id;
   document.getElementById('add-alarm-mo-title').textContent = t('edit_alarm_title');
   document.getElementById('na-submit-btn').textContent = t('edit_alarm_submit');
   renderVisionSelects();
-  document.getElementById('na-vision').value = a.vision;
-  document.getElementById('na-type').value = a.type;
-  document.getElementById('na-code').value = a.code;
-  document.getElementById('na-name').value = a.name;
-  document.getElementById('na-cause').value = a.direct_cause||'';
-  document.getElementById('na-occur').value = a.occurrence||'';
-  document.getElementById('na-infl').value = a.influence||'';
-  document.getElementById('na-sev').value = a.severity||'Warning';
-  document.getElementById('na-related').value = a.related_alarms||'';
-  const editSite = a.tr_site||'';
-  const editUnit = a.tr_unit||'';
+  document.getElementById('na-vision').value = g.vision;
+  document.getElementById('na-type').value = g.type;
+  document.getElementById('na-code').value = g.code;
+  document.getElementById('na-name').value = g.name;        // ← ga() 적용
+  document.getElementById('na-cause').value = g.direct_cause||'';
+  document.getElementById('na-occur').value = g.occurrence||'';
+  document.getElementById('na-infl').value = g.influence||'';
+  document.getElementById('na-sev').value = g.severity||'Warning';
+  document.getElementById('na-related').value = g.related_alarms||'';
+  const editSite = g.tr_site||'';
+  const editUnit = g.tr_unit||'';
   renderSiteSelect('na-site', editSite);
   renderUnitSelect(editSite, 'na-unit', editUnit);
   if(editSite){
@@ -256,15 +257,15 @@ function openEditAlarmModal(id){
     const su = siteUnits.find(x=>x.site===editSite);
     if(hint && su) hint.textContent = currentLang==='en'?`${su.units.length} lines`:`호기 ${su.units.length}개`;
   }
-  document.getElementById('na-hour').value = a.tr_hour||0;
-  document.getElementById('na-min').value = a.tr_min||0;
-  document.getElementById('na-keywords').value = (a.tr_keywords||[]).join(', ');
-  document.getElementById('na-desc').value = a.tr_desc||'';
-  document.getElementById('na-sev-t').value = a.severity||'Warning';
+  document.getElementById('na-hour').value = g.tr_hour||0;
+  document.getElementById('na-min').value = g.tr_min||0;
+  document.getElementById('na-keywords').value = (g.tr_keywords||[]).join(', ');
+  document.getElementById('na-desc').value = g.tr_desc||'';
+  document.getElementById('na-sev-t').value = g.severity||'Warning';
   // 등록일: 기존값 표시 (Admin만 수정 가능)
   const dateEl=document.getElementById('na-created-date');
   if(dateEl){
-    dateEl.value = a.created_date||'';
+    dateEl.value = g.created_date||'';
     dateEl.readOnly = !isAdmin;
     dateEl.style.opacity = isAdmin ? '1' : '0.5';
     dateEl.title = isAdmin ? '' : (currentLang==='en'?'Admin only':'관리자만 수정 가능');
