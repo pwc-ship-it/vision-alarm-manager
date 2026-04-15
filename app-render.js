@@ -536,7 +536,8 @@ function actCard(ac,k,i,allActs){
     : '';
 
   // 신규 4개 필드 vs 기존 text 필드 구분
-  const isNewFormat = ac.symptom || ac.cause || ac.action || ac.result;
+  // 신규 양식 판별: 4개 필드 중 하나라도 키 자체가 존재하면 신규 (빈 문자열도 신규로 처리)
+  const isNewFormat = 'symptom' in ac || 'cause' in ac || 'action' in ac || 'result' in ac;
 
   let contentHtml = '';
   if(isNewFormat){
@@ -594,7 +595,7 @@ function showEditAction(k,idx){
   const existing=card.querySelector('.ac-edit-form');
   if(existing){ existing.remove(); return; }
 
-  const isNewFmt = ac.symptom || ac.cause || ac.action || ac.result;
+  const isNewFmt = 'symptom' in ac || 'cause' in ac || 'action' in ac || 'result' in ac;
   const inpStyle = 'background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:7px;width:100%;resize:vertical';
 
   const form=document.createElement('div');
@@ -648,7 +649,7 @@ async function saveEditAction(k,idx){
   const ac=actions[k]?.[idx]; if(!ac) return;
   const lnk = document.getElementById(`ea-link-${k}-${idx}`)?.value.trim();
   const st  = document.getElementById(`ea-st-${k}-${idx}`)?.value;
-  const isNewFmt = ac.symptom || ac.cause || ac.action || ac.result;
+  const isNewFmt = 'symptom' in ac || 'cause' in ac || 'action' in ac || 'result' in ac;
 
   if(isNewFmt){
     const symptom = document.getElementById(`ea-symptom-${k}-${idx}`)?.value.trim()||'';
