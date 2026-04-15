@@ -482,6 +482,13 @@ function renderDetail(a){
             <input type="text" id="ac-auth" placeholder="${t('name_required')}" value="${esc(savedAuthor)}" maxlength="20">
             <input type="text" id="ac-site" placeholder="${t('site_optional')}" value="${esc(savedSite)}" maxlength="20">
           </div>
+          <div class="ac-date-row">
+            <label class="ac-date-lbl">📅 발생일</label>
+            <input type="date" id="ac-incident-date" class="ac-date-inp"
+              value="${new Date().toISOString().slice(0,10)}"
+              max="${new Date().toISOString().slice(0,10)}">
+            <span class="ac-date-hint">실제 발생일 또는 조치일 (기본: 오늘)</span>
+          </div>
           <div class="ac-fields">
             <div class="ac-field-row">
               <label class="ac-field-lbl ac-symptom-lbl">🔴 증상</label>
@@ -553,12 +560,20 @@ function actCard(ac,k,i,allActs){
     contentHtml = `<div class="ac-txt ac-legacy"><span class="ac-legacy-badge">기존</span>${esc(displayText)}</div>`;
   }
 
+  // 발생일 표시 (등록일과 다를 때만 표시)
+  const regDate      = (ac.date||'').slice(0,10);
+  const incidentDate = ac.incident_date||'';
+  const showIncident = incidentDate && incidentDate !== regDate;
+
   return `<div class="ac${best?' best':''}" id="ac-${k}-${i}">
     ${best?`<span class="best-b">★ Best</span>`:''}
     <div class="ac-meta">
       <span class="ac-auth">${esc(ac.author)}</span>
       ${ac.site?`<span class="ac-site">· ${esc(ac.site)}</span>`:''}
-      <span>${ac.date}</span>
+      ${showIncident
+        ?`<span class="ac-date-incident" title="실제 발생일">📅 ${incidentDate}</span><span class="ac-date-reg" title="등록일">등록: ${regDate}</span>`
+        :`<span>${regDate}</span>`
+      }
       <span style="margin-left:auto;display:flex;gap:4px">
         <button onclick="showEditAction('${k}',${i})" style="background:none;border:1px solid var(--border2);border-radius:4px;color:var(--text3);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="${t('edit')}">${t('edit')}</button>
         ${isAdmin?`<button onclick="deleteAction('${k}',${i})" style="background:none;border:1px solid rgba(255,77,106,.3);border-radius:4px;color:var(--red);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="${t('delete_admin')}">${t('delete_admin')}</button>`:''}
@@ -609,6 +624,11 @@ function showEditAction(k,idx){
     ` : `
       <textarea id="ea-txt-${k}-${idx}" style="${inpStyle};min-height:80px">${esc(ac.text||'')}</textarea>
     `}
+    <div class="ac-date-row" style="margin-top:4px">
+      <label class="ac-date-lbl">📅 발생일</label>
+      <input type="date" id="ea-date-${k}-${idx}" class="ac-date-inp"
+        value="${esc(ac.incident_date||ac.date?.slice(0,10)||new Date().toISOString().slice(0,10))}">
+    </div>
     <input type="text" id="ea-link-${k}-${idx}" placeholder="${t('ref_link')}" value="${esc(ac.link||'')}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%">
     <div style="display:flex;gap:5px;align-items:center">
       <select id="ea-st-${k}-${idx}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:5px 8px;flex:1">
@@ -641,7 +661,9 @@ async function saveEditAction(k,idx){
     const before = ac.text?.slice(0,60)||'';
     ac.symptom = symptom; ac.cause = cause;
     ac.action  = action;  ac.result = result;
+    const editIncDate = document.getElementById(`ea-date-${k}-${idx}`)?.value||'';
     ac.link = lnk; ac.status = st;
+    if(editIncDate) ac.incident_date = editIncDate;
     ac.text = [
       symptom?'증상: '+symptom:'',
       cause  ?'원인: '+cause  :'',
@@ -655,7 +677,9 @@ async function saveEditAction(k,idx){
     const txt = document.getElementById(`ea-txt-${k}-${idx}`)?.value.trim();
     if(!txt||txt.length<5){ showToast(currentLang==='en'?'Enter at least 5 characters':'5자 이상 입력하세요','err'); return; }
     const before = ac.text?.slice(0,60)||'';
+    const editIncDate2 = document.getElementById(`ea-date-${k}-${idx}`)?.value||'';
     ac.text=txt; ac.link=lnk; ac.status=st;
+    if(editIncDate2) ac.incident_date = editIncDate2;
     ac.edited=new Date().toISOString().slice(0,16).replace('T',' ');
     await saveActions();
     addAudit('조치방안 수정',k,ac.author,before,txt.slice(0,60));
@@ -720,8 +744,9 @@ async function markHelpful(k,idx){
 //  ADD ACTION
 // ══════════════════════════════════════
 async function addAction(k){
-  const author  = document.getElementById('ac-auth').value.trim();
-  const site    = document.getElementById('ac-site').value.trim();
+  const author        = document.getElementById('ac-auth').value.trim();
+  const site          = document.getElementById('ac-site').value.trim();
+  const incidentDate  = (document.getElementById('ac-incident-date')?.value||'').trim();
   const symptom = (document.getElementById('ac-symptom')?.value||'').trim();
   const cause   = (document.getElementById('ac-cause')?.value||'').trim();
   const action  = (document.getElementById('ac-action')?.value||'').trim();
@@ -756,7 +781,8 @@ async function addAction(k){
   const entry = {
     author, site, date: dateStr, status, helpful: 0,
     symptom, cause, action, result,
-    text: textCombined  // 기존 호환 + 검색 인덱스용
+    text: textCombined,  // 기존 호환 + 검색 인덱스용
+    incident_date: incidentDate || dateStr.slice(0,10)  // 실제 발생일
   };
   if(link) entry.link = link;
 
