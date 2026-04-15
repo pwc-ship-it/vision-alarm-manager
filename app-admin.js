@@ -133,6 +133,8 @@ function toggleAdmin(){
   b.style.borderColor=isAdmin?'rgba(255,179,71,.3)':'rgba(79,124,255,.3)';
   const vmb=document.getElementById('vision-manage-btn');
   if(vmb) vmb.style.display=isAdmin?'block':'none';
+  const bkb=document.getElementById('backup-btn');
+  if(bkb) bkb.style.display=isAdmin?'inline-flex':'none';
   if(isAdmin) checkTranslationStatus();
   if(curAlarm) renderDetail(curAlarm);
   showToast(isAdmin?t('admin_mode'):t('viewer_mode'),'ok');
@@ -234,22 +236,21 @@ function openAddAlarmModal(){
 function openEditAlarmModal(id){
   const a = alarms.find(x=>x.id===id);
   if(!a||!a.isCustom){ showToast(currentLang==='en'?'Cannot edit default alarms':'기본 알람은 수정할 수 없습니다','err'); return; }
-  const g = ga(a); // alarmEdits 반영된 최신 값 사용
   document.getElementById('na-edit-id').value = id;
   document.getElementById('add-alarm-mo-title').textContent = t('edit_alarm_title');
   document.getElementById('na-submit-btn').textContent = t('edit_alarm_submit');
   renderVisionSelects();
-  document.getElementById('na-vision').value = g.vision;
-  document.getElementById('na-type').value = g.type;
-  document.getElementById('na-code').value = g.code;
-  document.getElementById('na-name').value = g.name;        // ← ga() 적용
-  document.getElementById('na-cause').value = g.direct_cause||'';
-  document.getElementById('na-occur').value = g.occurrence||'';
-  document.getElementById('na-infl').value = g.influence||'';
-  document.getElementById('na-sev').value = g.severity||'Warning';
-  document.getElementById('na-related').value = g.related_alarms||'';
-  const editSite = g.tr_site||'';
-  const editUnit = g.tr_unit||'';
+  document.getElementById('na-vision').value = a.vision;
+  document.getElementById('na-type').value = a.type;
+  document.getElementById('na-code').value = a.code;
+  document.getElementById('na-name').value = a.name;
+  document.getElementById('na-cause').value = a.direct_cause||'';
+  document.getElementById('na-occur').value = a.occurrence||'';
+  document.getElementById('na-infl').value = a.influence||'';
+  document.getElementById('na-sev').value = a.severity||'Warning';
+  document.getElementById('na-related').value = a.related_alarms||'';
+  const editSite = a.tr_site||'';
+  const editUnit = a.tr_unit||'';
   renderSiteSelect('na-site', editSite);
   renderUnitSelect(editSite, 'na-unit', editUnit);
   if(editSite){
@@ -257,15 +258,15 @@ function openEditAlarmModal(id){
     const su = siteUnits.find(x=>x.site===editSite);
     if(hint && su) hint.textContent = currentLang==='en'?`${su.units.length} lines`:`호기 ${su.units.length}개`;
   }
-  document.getElementById('na-hour').value = g.tr_hour||0;
-  document.getElementById('na-min').value = g.tr_min||0;
-  document.getElementById('na-keywords').value = (g.tr_keywords||[]).join(', ');
-  document.getElementById('na-desc').value = g.tr_desc||'';
-  document.getElementById('na-sev-t').value = g.severity||'Warning';
+  document.getElementById('na-hour').value = a.tr_hour||0;
+  document.getElementById('na-min').value = a.tr_min||0;
+  document.getElementById('na-keywords').value = (a.tr_keywords||[]).join(', ');
+  document.getElementById('na-desc').value = a.tr_desc||'';
+  document.getElementById('na-sev-t').value = a.severity||'Warning';
   // 등록일: 기존값 표시 (Admin만 수정 가능)
   const dateEl=document.getElementById('na-created-date');
   if(dateEl){
-    dateEl.value = g.created_date||'';
+    dateEl.value = a.created_date||'';
     dateEl.readOnly = !isAdmin;
     dateEl.style.opacity = isAdmin ? '1' : '0.5';
     dateEl.title = isAdmin ? '' : (currentLang==='en'?'Admin only':'관리자만 수정 가능');
@@ -593,3 +594,277 @@ function handleUpload(event){
     showToast(`${added}${t('added')}`,'ok');
   }
 }
+
+// ══════════════════════════════════════
+//  BACKUP / RESTORE
+// ══════════════════════════════════════
+
+// ── exportBackup: Firebase 우선, 실패 시 localStorage 폴백 ──
+async function exportBackup(){
+  showToast(currentLang==='en'?'⏳ Collecting backup data...':'⏳ 백업 데이터 수집 중...','');
+  let source='localStorage';
+  let data={
+    actions:      gS('vam_actions',{}),
+    customAlarms: gS('vam_custom_alarms',[]),
+    alarmEdits:   gS('vam_alarm_edits',{}),
+    auditLog:     gS('vam_audit',[]),
+    customVisions:gS('vam_custom_visions',[]),
+    customTypes:  gS('vam_custom_types',[]),
+    siteUnits:    gS('vam_site_units',[])
+  };
+  if(fbOnline){
+    try{
+      const [actD,editD,auditD,caD,cvD,ctD,suD]=await Promise.all([
+        fbGet('actions'),fbGet('alarmEdits'),fbGet('auditLog'),
+        fbGet('customAlarms'),fbGet('customVisions'),fbGet('customTypes'),fbGet('siteUnits')
+      ]);
+      if(actD  && typeof actD==='object')  data.actions      = actD;
+      if(editD && typeof editD==='object') data.alarmEdits   = editD;
+      if(auditD) data.auditLog     = Array.isArray(auditD)?auditD:Object.values(auditD);
+      if(caD)    data.customAlarms = Array.isArray(caD)?caD:Object.values(caD).filter(Boolean);
+      if(cvD)    data.customVisions= Array.isArray(cvD)?cvD:Object.values(cvD).filter(Boolean);
+      if(ctD)    data.customTypes  = Array.isArray(ctD)?ctD:Object.values(ctD).filter(Boolean);
+      if(suD)    data.siteUnits    = Array.isArray(suD)?suD:Object.values(suD).filter(x=>x&&typeof x==='object');
+      source='Firebase';
+    } catch(e){
+      console.warn('[Backup] Firebase 읽기 실패, localStorage 사용:',e);
+      source='localStorage (Firebase 오류)';
+    }
+  }
+  // 통계 계산
+  const actCount  = Object.values(data.actions||{}).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);
+  const alarmCount= (data.customAlarms||[]).length;
+  const troubleCount=(data.customAlarms||[]).filter(a=>a.type==='Trouble').length;
+
+  const backup={
+    _date:    new Date().toISOString(),
+    _version: 2,
+    _source:  source,
+    _stats:   { actions:actCount, customAlarms:alarmCount, troubles:troubleCount },
+    ...data
+  };
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='vam_backup_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+  const msg= currentLang==='en'
+    ? `✅ Backup complete (${source}) — Actions:${actCount} / Alarms:${alarmCount}`
+    : `✅ 백업 완료 (출처:${source}) — 조치방안:${actCount}건 / 알람:${alarmCount}건`;
+  showToast(msg,'ok');
+}
+
+// ── importBackup: 충돌 건수 표시 후 3가지 모드 선택 ──
+async function importBackup(event){
+  const file=event.target.files[0];
+  if(!file) return;
+  // 파일명 표시
+  const fnEl=document.getElementById('restore-file-name');
+  if(fnEl) fnEl.textContent=file.name;
+  event.target.value=''; // 동일 파일 재선택 허용
+
+  try{
+    const text=await file.text();
+    const backup=JSON.parse(text);
+    if(!backup._version) throw new Error(currentLang==='en'?'Not a valid backup file':'올바른 백업 파일이 아닙니다');
+
+    const backupDate=(backup._date||'').slice(0,16).replace('T',' ')||'날짜 불명';
+    const src=backup._source||'?';
+    const stats=backup._stats||{};
+
+    // ── 충돌 항목 수 계산 ──
+    let cAct=0, cAlarm=0, cEdit=0;
+    if(backup.actions && typeof backup.actions==='object'){
+      Object.entries(backup.actions).forEach(([k,arr])=>{
+        if(!Array.isArray(arr)) return;
+        const cur=actions[k];
+        if(!Array.isArray(cur)) return;
+        const curKeys=new Set(cur.map(x=>(x.author||'')+'|'+(x.date||'')));
+        arr.forEach(x=>{ if(curKeys.has((x.author||'')+'|'+(x.date||''))) cAct++; });
+      });
+    }
+    if(Array.isArray(backup.customAlarms)){
+      const curIds=new Set(customAlarms.map(a=>a.id));
+      backup.customAlarms.forEach(a=>{ if(curIds.has(a.id)) cAlarm++; });
+    }
+    if(backup.alarmEdits && typeof backup.alarmEdits==='object'){
+      Object.keys(backup.alarmEdits).forEach(k=>{ if(alarmEdits[k]) cEdit++; });
+    }
+    const totalConflict=cAct+cAlarm+cEdit;
+
+    // ── Step 1: 충돌 현황 안내 + 현재우선 vs 다음단계 ──
+    const isEn=currentLang==='en';
+    const step1msg= isEn
+      ? `📂 Backup: ${backupDate}  (Source: ${src})\n`
+       +`Stats: Actions ${stats.actions??'?'} / Alarms ${stats.customAlarms??'?'}\n\n`
+       +`Conflicts detected:\n`
+       +`  • Action plans : ${cAct}\n`
+       +`  • Custom alarms/troubles : ${cAlarm}\n`
+       +`  • Alarm edits : ${cEdit}\n`
+       +`  Total: ${totalConflict} items\n\n`
+       +`[OK]     → Keep Current  (keep existing on conflict, add backup-only items)\n`
+       +`[Cancel] → Next: choose Backup-first or Full Overwrite`
+      : `📂 백업: ${backupDate}  (출처: ${src})\n`
+       +`백업 통계: 조치방안 ${stats.actions??'?'}건 / 알람 ${stats.customAlarms??'?'}건\n\n`
+       +`충돌 항목:\n`
+       +`  • 조치방안  : ${cAct}건\n`
+       +`  • 커스텀 알람/트러블 : ${cAlarm}건\n`
+       +`  • 알람 수정이력 : ${cEdit}건\n`
+       +`  합계: ${totalConflict}건\n\n`
+       +`[확인] → 현재 우선  (충돌 시 현재 것 유지, 백업에만 있는 신규만 추가)\n`
+       +`[취소] → 다음: 백업 우선 또는 완전 덮어쓰기 선택`;
+
+    const keepCurrent=confirm(step1msg);
+
+    let mode; // 'keep-current' | 'backup-first' | 'overwrite'
+    if(keepCurrent){
+      mode='keep-current';
+    } else {
+      const step2msg= isEn
+        ? `Choose conflict resolution:\n\n`
+         +`[OK]     → Backup-first  (replace conflicts with backup, keep current-only items)\n`
+         +`[Cancel] → Full Overwrite  (replace ALL current data with backup)`
+        : `충돌 해결 방식 선택:\n\n`
+         +`[확인] → 백업 우선  (충돌 시 백업으로 교체, 현재에만 있는 항목은 유지)\n`
+         +`[취소] → 완전 덮어쓰기  (현재 데이터 전체를 백업으로 교체)`;
+      const backupFirst=confirm(step2msg);
+      mode=backupFirst?'backup-first':'overwrite';
+    }
+
+    // ── 조치방안 처리 ──
+    if(backup.actions && typeof backup.actions==='object'){
+      if(mode==='overwrite'){
+        actions=backup.actions;
+      } else {
+        const merged={...actions};
+        Object.entries(backup.actions).forEach(([k,arr])=>{
+          if(!Array.isArray(arr)) return;
+          const existing=Array.isArray(merged[k])?merged[k]:[];
+          const curKeys=new Set(existing.map(x=>(x.author||'')+'|'+(x.date||'')));
+          if(mode==='keep-current'){
+            // 현재 우선: 현재에 없는 것만 추가
+            const newItems=arr.filter(x=>!curKeys.has((x.author||'')+'|'+(x.date||'')));
+            merged[k]=[...existing,...newItems];
+          } else {
+            // 백업 우선: 충돌은 백업으로 교체, 현재에만 있는 것은 유지
+            const backupKeys=new Set(arr.map(x=>(x.author||'')+'|'+(x.date||'')));
+            const onlyCurrent=existing.filter(x=>!backupKeys.has((x.author||'')+'|'+(x.date||'')));
+            merged[k]=[...arr,...onlyCurrent];
+          }
+        });
+        actions=merged;
+      }
+      await saveActions();
+    }
+
+    // ── 커스텀 알람/트러블 처리 ──
+    if(Array.isArray(backup.customAlarms)){
+      if(mode==='overwrite'){
+        customAlarms=backup.customAlarms;
+      } else {
+        const curIds=new Set(customAlarms.map(a=>a.id));
+        if(mode==='keep-current'){
+          const newOnly=backup.customAlarms.filter(a=>!curIds.has(a.id));
+          customAlarms=[...customAlarms,...newOnly];
+        } else {
+          // 백업 우선: 백업 목록 + 현재에만 있는 것
+          const backupIds=new Set(backup.customAlarms.map(a=>a.id));
+          const onlyCurrent=customAlarms.filter(a=>!backupIds.has(a.id));
+          customAlarms=[...backup.customAlarms,...onlyCurrent];
+        }
+      }
+      await saveCustomAlarms();
+    }
+
+    // ── 알람 수정이력 처리 ──
+    if(backup.alarmEdits && typeof backup.alarmEdits==='object'){
+      if(mode==='overwrite'){
+        alarmEdits=backup.alarmEdits;
+      } else if(mode==='keep-current'){
+        alarmEdits={...backup.alarmEdits,...alarmEdits}; // 현재가 뒤에 와서 충돌 시 덮어씀
+      } else {
+        alarmEdits={...alarmEdits,...backup.alarmEdits}; // 백업이 뒤에 와서 충돌 시 덮어씀
+      }
+      await saveAlarmEdits();
+    }
+
+    // ── 감사 로그: 항상 병합 (날짜+타입+대상 기준 중복 제거) ──
+    if(Array.isArray(backup.auditLog)){
+      if(mode==='overwrite'){
+        auditLog=backup.auditLog;
+      } else {
+        const curKeys=new Set(auditLog.map(h=>(h.date||'')+'|'+(h.type||'')+'|'+(h.target||'')));
+        const newLogs=backup.auditLog.filter(h=>!curKeys.has((h.date||'')+'|'+(h.type||'')+'|'+(h.target||'')));
+        auditLog=[...auditLog,...newLogs].sort((a,b)=>((a.date||'')>(b.date||'')?1:-1));
+      }
+      await saveAudit();
+    }
+
+    // ── 커스텀 Vision / Type: 항상 병합 (중복 제거) ──
+    if(Array.isArray(backup.customVisions)){
+      customVisions=[...new Set([...customVisions,...backup.customVisions])];
+      await saveCustomVisions();
+    }
+    if(Array.isArray(backup.customTypes)){
+      customTypes=[...new Set([...customTypes,...backup.customTypes])];
+      await saveCustomTypes();
+    }
+
+    // ── 사이트/호기 처리 ──
+    if(Array.isArray(backup.siteUnits)){
+      if(mode==='overwrite'){
+        siteUnits=backup.siteUnits;
+      } else {
+        const merged=[...siteUnits];
+        backup.siteUnits.forEach(bSu=>{
+          const exist=merged.find(x=>x.site===bSu.site);
+          if(exist){
+            exist.units=[...new Set([...exist.units,...bSu.units])];
+          } else {
+            merged.push(bSu);
+          }
+        });
+        siteUnits=merged;
+      }
+      await saveSiteUnits();
+    }
+
+    // ── 감사 로그에 복원 이벤트 기록 ──
+    const modeLabel=isEn
+      ? {keep:'Keep Current','backup-first':'Backup-first',overwrite:'Full Overwrite'}
+      : {keep:'현재 우선','backup-first':'백업 우선',overwrite:'완전 덮어쓰기'};
+    const modeTxt=(modeLabel[mode==='keep-current'?'keep':mode])||mode;
+    addAudit('백업 복원','backup-import','Admin','',`${modeTxt} / ${backupDate}`);
+    await saveAudit();
+
+    // ── UI 갱신 ──
+    rebuildAlarms();
+    applyFilters(); updateStats(); renderRight();
+    if(curAlarm){
+      const upd=alarms.find(x=>x.id===curAlarm.id);
+      if(upd){ curAlarm=upd; renderDetail(upd); }
+      else { curAlarm=null; document.getElementById('dp').classList.remove('open'); }
+    }
+
+    const modeLabelKo={
+      'keep-current':'현재 우선','backup-first':'백업 우선','overwrite':'완전 덮어쓰기'
+    };
+    const modeLabelEn={
+      'keep-current':'Keep Current','backup-first':'Backup-first','overwrite':'Full Overwrite'
+    };
+    const finalLabel=isEn?(modeLabelEn[mode]||mode):(modeLabelKo[mode]||mode);
+    showToast(`✅ ${isEn?'Restore complete':'복원 완료'} (${finalLabel})`,'ok');
+
+  } catch(e){
+    showToast(`❌ ${currentLang==='en'?'Restore failed':'복원 실패'}: ${e.message}`,'err');
+    console.error('[importBackup] error:',e);
+  }
+}
+
+// ── 백업 모달 열기/닫기 ──
+function openBackupModal(){
+  if(!isAdmin){ showToast(currentLang==='en'?'Admin required':'관리자 권한 필요','err'); return; }
+  document.getElementById('backup-mo').classList.add('open');
+}
+function closeBackupModal(){ document.getElementById('backup-mo').classList.remove('open'); }
