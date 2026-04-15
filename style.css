@@ -787,3 +787,79 @@ html[lang="en"] .icv{font-size:11px;line-height:1.5;white-space:pre-wrap}
   gap:3px;margin-top:5px;text-decoration:none;background:var(--aglow);
   padding:2px 8px;border-radius:4px;border:1px solid rgba(79,124,255,.2);
 }
+
+/* ══════════════════════════════════════
+   사용자 관리 — 개선된 레이아웃
+   ══════════════════════════════════════ */
+#user-manage-mo .md{ max-width:800px; max-height:85vh; }
+#um-body{ max-height:60vh; overflow-y:auto; }
+
+.um-section-hdr{
+  display:flex;align-items:center;flex-wrap:wrap;gap:6px;
+  padding:8px 10px;background:var(--bg4);
+  border-radius:var(--r);margin:10px 0 5px;
+  border:1px solid var(--border2);
+}
+.um-section-title{
+  font-size:13px;font-weight:700;color:var(--text);min-width:60px;
+}
+.um-section-stats{
+  display:flex;gap:4px;flex-wrap:wrap;
+}
+.um-stat-badge{
+  font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;
+}
+.um-stat-total{    background:var(--bg3);color:var(--text3); }
+.um-stat-pending{  background:rgba(255,179,71,.15);color:var(--yellow); }
+.um-stat-approved{ background:rgba(76,175,133,.12);color:var(--green); }
+.um-stat-suspended{background:rgba(255,77,106,.12);color:var(--red); }
+
+.um-pending{ border-left:3px solid var(--yellow) !important; }
+
+/* 사용자 태그 */
+.um-tag{
+  font-size:9px;font-weight:700;padding:1px 5px;
+  border-radius:3px;margin-left:4px;vertical-align:middle;
+}
+.um-tag-me{      background:var(--aglow);color:var(--accent); }
+.um-tag-admin{   background:rgba(255,179,71,.15);color:var(--yellow); }
+.um-tag-inactive{background:rgba(255,77,106,.1);color:var(--red); }
+
+.um-email{
+  cursor:pointer;transition:color .15s;
+}
+.um-email:hover{ color:var(--accent); }
+.um-copy-icon{ font-size:10px;opacity:.5; }
+.um-inactive-txt{ color:var(--red) !important; }
+
+/* ══════════════════════════════════════
+   조치방안 발생일 필드
+   ══════════════════════════════════════ */
+.ac-date-row{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 0;
+}
+.ac-date-lbl{
+  font-size:11px;font-weight:600;color:var(--text2);
+  white-space:nowrap;min-width:52px;
+}
+.ac-date-inp{
+  background:var(--bg4);border:1px solid var(--border);
+  border-radius:var(--r);color:var(--text);
+  font-family:var(--font);font-size:12px;padding:5px 8px;
+  cursor:pointer;
+}
+.ac-date-inp:focus{ outline:none;border-color:var(--accent); }
+.ac-date-hint{
+  font-size:10px;color:var(--text3);
+}
+
+/* 카드에서 발생일 표시 */
+.ac-date-incident{
+  font-size:11px;font-weight:600;color:var(--accent);
+  background:var(--aglow);padding:1px 6px;border-radius:4px;
+  border:1px solid rgba(79,124,255,.2);
+}
+.ac-date-reg{
+  font-size:10px;color:var(--text3);
+}
