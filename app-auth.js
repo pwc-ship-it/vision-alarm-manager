@@ -91,13 +91,23 @@ function initAuth(){
 async function onUserSignedIn(user){
   currentUser = user;
   try{
-    // DB에서 사용자 프로필 조회 — Auth 토큰 직접 포함
-    const idToken = await user.getIdToken();
-    const dbUrl = (typeof FB_URL !== 'undefined' && FB_URL)
-      ? FB_URL
-      : 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
-    const resp = await fetch(`${dbUrl}/users/${user.uid}.json?auth=${idToken}`);
+    // DB URL 결정 (하드코딩 우선, 없으면 localStorage)
+    const dbUrl = 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+    // Auth 토큰 획득 (재시도 포함)
+    let idToken = null;
+    for(let i=0; i<3; i++){
+      try{ idToken = await user.getIdToken(true); break; }
+      catch(e){ await new Promise(r=>setTimeout(r,500)); }
+    }
+
+    // 프로필 조회 — 토큰 있으면 포함, 없으면 그냥 시도 (규칙이 열려있는 경우)
+    const url = idToken
+      ? `${dbUrl}/users/${user.uid}.json?auth=${idToken}`
+      : `${dbUrl}/users/${user.uid}.json`;
+    const resp = await fetch(url);
     const profile = resp.ok ? await resp.json() : null;
+    console.log('[Auth] 프로필 조회:', profile ? '성공' : '실패', resp.status);
 
     // 프로필이 없는 경우 (비정상)
     if(!profile || !profile.status){
