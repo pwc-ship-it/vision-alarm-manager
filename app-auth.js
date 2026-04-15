@@ -87,78 +87,94 @@ function initAuth(){
 //  로그인 성공 처리
 // ══════════════════════════════════════
 async function onUserSignedIn(user){
+  // 중복 호출 방지
+  if(currentUserProfile) return;
   currentUser = user;
-  try{
-    console.log('[Auth] 프로필 조회 시작:', user.uid);
+  console.log('[Auth] onUserSignedIn 시작:', user.uid);
 
-    // Firebase Database SDK로 프로필 조회 (fetch 대신)
-    let profile = null;
-    try{
-      const db  = firebase.database();
-      const ref = db.ref('users/' + user.uid);
-      const snap = await ref.once('value');
-      profile = snap.val();
-      console.log('[Auth] 프로필 조회 완료:', profile ? '성공' : 'null');
-    } catch(e){
-      console.error('[Auth] DB SDK 조회 실패:', e);
-      // fallback: fbGet 시도
-      profile = await fbGet('users/' + user.uid);
-      console.log('[Auth] fbGet fallback:', profile ? '성공' : 'null');
+  try{
+    // Firebase Database SDK 준비 대기 (최대 3초)
+    let db = null;
+    for(let i = 0; i < 6; i++){
+      try{
+        db = firebase.database();
+        if(db) break;
+      } catch(e){}
+      await new Promise(r => setTimeout(r, 500));
     }
 
-    // 프로필이 없는 경우 (비정상)
+    if(!db){
+      console.error('[Auth] Database SDK 초기화 실패');
+      showAuthError('login', 'DB 연결 실패. 페이지를 새로고침해 주세요.');
+      return;
+    }
+
+    // 프로필 조회 (재시도 3회)
+    let profile = null;
+    for(let i = 0; i < 3; i++){
+      try{
+        const snap = await db.ref('users/' + user.uid).once('value');
+        profile = snap.val();
+        console.log('[Auth] 프로필 조회 시도', i+1, ':', profile ? '성공' : 'null');
+        if(profile) break;
+      } catch(e){
+        console.warn('[Auth] 조회 시도', i+1, '실패:', e.message);
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // 프로필 없음
     if(!profile || !profile.status){
+      console.error('[Auth] 프로필 없음 — signOut');
+      setAuthLoading(false);
       await firebaseAuth.signOut();
       showAuthError('login', '계정 정보를 찾을 수 없습니다. 관리자에게 문의하세요.');
       return;
     }
 
-    // 승인 대기 상태
+    // 상태별 처리
     if(profile.status === 'pending'){
       currentUser = null;
+      setAuthLoading(false);
       await firebaseAuth.signOut();
       showPendingScreen(profile);
       return;
     }
-
-    // 거절된 계정
     if(profile.status === 'rejected'){
       currentUser = null;
+      setAuthLoading(false);
       await firebaseAuth.signOut();
       showAuthError('login', '가입이 거절된 계정입니다. 관리자에게 문의하세요.');
       return;
     }
-
-    // 정지된 계정
     if(profile.status === 'suspended'){
       currentUser = null;
+      setAuthLoading(false);
       await firebaseAuth.signOut();
       showAuthError('login', '정지된 계정입니다. 관리자에게 문의하세요.');
       return;
     }
 
-    // 승인된 계정 진입
+    // 승인된 계정 — 앱 진입
+    console.log('[Auth] 승인된 계정 진입:', profile.name, profile.role);
     currentUserProfile = profile;
-
-    // 마지막 로그인 시간 기록
-    try{
-      const db = firebase.database();
-      await db.ref('users/' + user.uid + '/lastLogin').set(new Date().toISOString());
-    } catch(e){ console.warn('[Auth] lastLogin 업데이트 실패:', e); }
-
-    // isAdmin 전역 변수 동기화 (기존 코드 호환)
     isAdmin = (profile.role === 'admin');
 
-    // 세션 타이머 시작
+    // lastLogin 기록 (비동기, 실패해도 진입 가능)
+    db.ref('users/' + user.uid + '/lastLogin')
+      .set(new Date().toISOString())
+      .catch(e => console.warn('[Auth] lastLogin 실패:', e));
+
+    // 세션 타이머
     startSessionTimer();
 
-    // 앱 화면 표시
+    // UI 전환
     hideAuthScreen();
     setAuthLoading(false);
     updateTopbarUser();
     showLoggedInButtons();
 
-    // 앱 초기화 (아직 안 된 경우)
+    // 앱 초기화
     if(!appInitialized){
       await initApp();
     } else {
@@ -166,8 +182,9 @@ async function onUserSignedIn(user){
     }
 
   } catch(e){
-    console.error('[Auth] 프로필 조회 실패:', e);
-    showAuthError('login', '로그인 처리 중 오류가 발생했습니다.');
+    console.error('[Auth] onUserSignedIn 오류:', e);
+    setAuthLoading(false);
+    showAuthError('login', '로그인 처리 중 오류: ' + e.message);
   }
 }
 
@@ -202,8 +219,7 @@ async function doLogin(){
   try{
     const cred = await firebaseAuth.signInWithEmailAndPassword(email, pw);
     console.log('[Auth] 로그인 성공:', cred.user.uid);
-    // onAuthStateChanged 에서 처리되지만 직접도 호출 (안전장치)
-    if(cred.user) await onUserSignedIn(cred.user);
+    // onAuthStateChanged에서 처리 (직접 호출 제거 — 중복 방지)
   } catch(e){
     setAuthLoading(false);
     const msg = authErrMsg(e.code);
