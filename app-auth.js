@@ -91,8 +91,13 @@ function initAuth(){
 async function onUserSignedIn(user){
   currentUser = user;
   try{
-    // DB에서 사용자 프로필 조회
-    const profile = await fbGet('users/' + user.uid);
+    // DB에서 사용자 프로필 조회 — Auth 토큰 직접 포함
+    const idToken = await user.getIdToken();
+    const dbUrl = (typeof FB_URL !== 'undefined' && FB_URL)
+      ? FB_URL
+      : 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
+    const resp = await fetch(`${dbUrl}/users/${user.uid}.json?auth=${idToken}`);
+    const profile = resp.ok ? await resp.json() : null;
 
     // 프로필이 없는 경우 (비정상)
     if(!profile || !profile.status){
@@ -129,8 +134,17 @@ async function onUserSignedIn(user){
     currentUserProfile = profile;
 
     // 마지막 로그인 시간 기록
-    const now = new Date().toISOString();
-    await fbPatch('users/' + user.uid, { lastLogin: now });
+    try{
+      const idToken2 = await user.getIdToken();
+      const dbUrl2 = (typeof FB_URL !== 'undefined' && FB_URL)
+        ? FB_URL
+        : 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
+      await fetch(`${dbUrl2}/users/${user.uid}.json?auth=${idToken2}`, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ lastLogin: new Date().toISOString() })
+      });
+    } catch(e){ console.warn('[Auth] lastLogin 업데이트 실패:', e); }
 
     // isAdmin 전역 변수 동기화 (기존 코드 호환)
     isAdmin = (profile.role === 'admin');
@@ -140,7 +154,9 @@ async function onUserSignedIn(user){
 
     // 앱 화면 표시
     hideAuthScreen();
+    setAuthLoading(false);
     updateTopbarUser();
+    showLoggedInButtons();
 
     // 앱 초기화 (아직 안 된 경우)
     if(!appInitialized){
