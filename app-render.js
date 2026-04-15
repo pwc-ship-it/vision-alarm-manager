@@ -112,28 +112,121 @@ function applyFilters(){
   const sort=document.getElementById('sort-sel').value;
   const noActOnly=document.getElementById('noact-f').checked;
 
-  filtered = alarms.filter(a=>{
-    const g=ga(a);
-    if(v&&g.vision!==v) return false;
-    if(tp&&g.type!==tp) return false;
-    if(sevFilter&&g.severity!==sevFilter) return false;
-    const k=ak(a); const acts=actions[k]||[];
-    if(noActOnly&&acts.length>0) return false;
-    if(qTerms.length){
-      const hay=[
-        String(g.code), g.name, g.direct_cause, g.occurrence,
-        g.influence, g.related_alarms, g.log,
-        g.tr_site||'', g.tr_unit||'', g.tr_desc||'',
-        (g.tr_keywords||[]).join(' ')
-      ].join(' ').toLowerCase();
-      const atxt=acts.map(x=>(x.text||'')+' '+(x.author||'')).join(' ').toLowerCase();
-      const combined = hay + ' ' + atxt;
-      if(!qTerms.every(term => combined.includes(term))) return false;
+  // ── 검색어 분석 ──
+  // 숫자만 입력: 코드 검색 모드 (예: "70" → C70만)
+  // "c70" 또는 "C70": 코드 정확 검색
+  // 일반 텍스트: 필드별 가중치 검색
+  const isCodeSearch = qTerms.length === 1 && /^c?\d+$/i.test(qTerms[0]);
+  const codeNum = isCodeSearch ? parseInt(qTerms[0].replace(/^c/i,'')) : null;
+
+  // 단어 경계 매칭 함수 — "70"이 "170" 안에서 히트되지 않도록
+  function wordMatch(text, term){
+    if(!text) return false;
+    const t2 = text.toLowerCase();
+    const idx = t2.indexOf(term);
+    if(idx === -1) return false;
+    // 앞뒤가 숫자/알파벳이면 단어 경계가 아님
+    const before = idx > 0 ? t2[idx-1] : ' ';
+    const after  = idx + term.length < t2.length ? t2[idx + term.length] : ' ';
+    const isBoundary = !/[a-z0-9가-힣]/.test(before) && !/[a-z0-9가-힣]/.test(after);
+    return isBoundary;
+  }
+
+  // 알람별 관련도 점수 계산
+  function scoreAlarm(a, g, acts){
+    if(!qTerms.length) return 0;
+    let score = 0;
+
+    if(isCodeSearch && codeNum !== null){
+      if(g.code === codeNum) score += 1000; // 코드 정확 일치만
+      return score;
     }
-    return true;
+
+    for(const term of qTerms){
+      // 코드 정확 일치 (숫자 검색어일 때)
+      if(/^\d+$/.test(term) && g.code === parseInt(term)) score += 500;
+
+      // 알람명 일치 — 가장 높은 가중치
+      if(g.name && g.name.toLowerCase().includes(term))       score += 200;
+
+      // 직접원인 / 발생조건
+      if(g.direct_cause && g.direct_cause.toLowerCase().includes(term)) score += 80;
+      if(g.occurrence   && g.occurrence.toLowerCase().includes(term))   score += 60;
+      if(g.influence    && g.influence.toLowerCase().includes(term))     score += 50;
+
+      // 트러블 필드
+      if(g.tr_desc && g.tr_desc.toLowerCase().includes(term))           score += 80;
+      if((g.tr_keywords||[]).some(k=>k.toLowerCase().includes(term)))   score += 100;
+
+      // 조치방안 4개 필드 + 기존 text
+      for(const ac of acts){
+        if(ac.symptom && ac.symptom.toLowerCase().includes(term)) score += 60;
+        if(ac.cause   && ac.cause.toLowerCase().includes(term))   score += 60;
+        if(ac.action  && ac.action.toLowerCase().includes(term))  score += 50;
+        if(ac.result  && ac.result.toLowerCase().includes(term))  score += 40;
+        if(ac.text    && ac.text.toLowerCase().includes(term))    score += 30;
+        if(ac.author  && ac.author.toLowerCase().includes(term))  score += 20;
+      }
+
+      // 로그/관련알람 — 낮은 가중치
+      if(g.log            && g.log.toLowerCase().includes(term))           score += 20;
+      if(g.related_alarms && g.related_alarms.toLowerCase().includes(term)) score += 15;
+    }
+    return score;
+  }
+
+  // ── 필터링 ──
+  const scoredAlarms = [];
+  alarms.forEach(a=>{
+    const g=ga(a);
+    if(v&&g.vision!==v) return;
+    if(tp&&g.type!==tp) return;
+    if(sevFilter&&g.severity!==sevFilter) return;
+    const k=ak(a); const acts=actions[k]||[];
+    if(noActOnly&&acts.length>0) return;
+
+    if(qTerms.length){
+      // 코드 검색 모드: 정확/전방 매칭만
+      if(isCodeSearch && codeNum !== null){
+        // 코드 정확 매칭만 (70 검색 시 C70만, C700/C170 제외)
+        if(g.code !== codeNum) return;
+      } else {
+        // 일반 검색: 모든 term이 어딘가에 포함되어야 함
+        const allFields = [
+          String(g.code), g.name||'', g.direct_cause||'', g.occurrence||'',
+          g.influence||'', g.related_alarms||'', g.log||'',
+          g.tr_site||'', g.tr_unit||'', g.tr_desc||'',
+          (g.tr_keywords||[]).join(' '),
+          acts.map(x=>[x.text,x.symptom,x.cause,x.action,x.result,x.author].filter(Boolean).join(' ')).join(' ')
+        ].join(' ').toLowerCase();
+
+        // 숫자 단독 검색어는 단어 경계 체크, 텍스트는 includes
+        const matches = qTerms.every(term=>{
+          if(/^\d+$/.test(term)){
+            // 숫자: 코드 정확 일치 우선, 없으면 단어 경계 매칭
+            return g.code === parseInt(term) || wordMatch(allFields, term);
+          }
+          return allFields.includes(term);
+        });
+        if(!matches) return;
+      }
+    }
+
+    const sc = scoreAlarm(a, g, acts);
+    scoredAlarms.push({a, sc});
   });
 
+  filtered = scoredAlarms.map(x=>x.a);
+
+  // ── 정렬 ──
   filtered.sort((a,b)=>{
+    // 검색어 있을 때: 관련도 점수 우선
+    if(qTerms.length && sort==='code'){
+      const sa = scoredAlarms.find(x=>x.a===a)?.sc || 0;
+      const sb = scoredAlarms.find(x=>x.a===b)?.sc || 0;
+      if(sa !== sb) return sb - sa; // 점수 높은 것 먼저
+      return a.code - b.code;       // 점수 같으면 코드순
+    }
     if(sort==='code') return a.code-b.code;
     if(sort==='name') return (a.name||'').localeCompare(b.name||'');
     if(sort==='sev'){ const o={Critical:0,Warning:1,Info:2}; return (o[a.severity]||2)-(o[b.severity]||2); }
@@ -147,7 +240,14 @@ function applyFilters(){
 
   pgCur = 1;
   renderList(raw);
-  document.getElementById('res-cnt').textContent = filtered.length + t('alarm_count');
+
+  // 검색 모드 안내 표시
+  let cntMsg = filtered.length + t('alarm_count');
+  if(qTerms.length){
+    if(isCodeSearch) cntMsg += '  🔢 코드 검색';
+    else             cntMsg += '  🔍 관련도순';
+  }
+  document.getElementById('res-cnt').textContent = cntMsg;
   updateStats();
   if(raw.length>1||v||sevFilter) logSearch((v||'ALL')+'_'+(document.getElementById('sel-t').value||'ALL')+'_'+raw);
 }
