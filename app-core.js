@@ -28,10 +28,11 @@ async function fbGet(path){
 
 async function getAuthToken(){
   try{
-    if(typeof firebase !== 'undefined' && firebase.apps.length && firebase.auth().currentUser){
-      return await firebase.auth().currentUser.getIdToken();
+    if(typeof firebase !== 'undefined' && firebase.apps.length){
+      const u = firebase.auth().currentUser;
+      if(u) return await u.getIdToken(false); // false = 캐시 우선 (빠름)
     }
-  } catch(e){}
+  } catch(e){ console.warn('[Auth] 토큰 조회 실패:', e); }
   return null;
 }
 
