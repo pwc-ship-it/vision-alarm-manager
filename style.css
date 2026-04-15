@@ -412,3 +412,163 @@ html[lang="en"] .icv{font-size:11px;line-height:1.5;white-space:pre-wrap}
   color:var(--text3);cursor:pointer;font-size:11px;padding:4px 12px;font-family:var(--font)}
 .vm-tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .vm-tab:hover:not(.on){border-color:var(--border2);color:var(--text)}
+
+/* ══════════════════════════════════════
+   AUTH SCREEN — 로그인/가입/비밀번호 찾기
+   ══════════════════════════════════════ */
+#auth-screen{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  z-index:9000;padding:20px;
+}
+.auth-box{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:var(--rl);padding:36px 32px;width:100%;max-width:420px;
+  box-shadow:0 8px 40px rgba(0,0,0,.5);
+}
+.auth-logo{
+  text-align:center;margin-bottom:28px;
+}
+.auth-logo-title{
+  font-family:var(--disp);font-size:22px;letter-spacing:2px;color:#fff;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.auth-logo-title span{color:var(--accent)}
+.auth-logo-sub{
+  font-size:11px;color:var(--text3);margin-top:4px;letter-spacing:1px;
+}
+.auth-tabs{
+  display:flex;gap:0;margin-bottom:24px;
+  border-bottom:1px solid var(--border);
+}
+.auth-tab{
+  flex:1;padding:8px 0;font-size:12px;font-weight:500;
+  color:var(--text3);background:none;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;
+  font-family:var(--font);
+}
+.auth-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.auth-tab:hover{color:var(--text)}
+.auth-form-group{margin-bottom:14px}
+.auth-form-group label{
+  display:block;font-size:11px;color:var(--text3);margin-bottom:5px;font-weight:500;
+}
+.auth-inp{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);color:var(--text);font-family:var(--font);
+  font-size:13px;padding:9px 12px;transition:border-color .15s;
+}
+.auth-inp:focus{outline:none;border-color:var(--accent)}
+.auth-err{
+  display:none;background:var(--redbg);color:var(--red);
+  border:1px solid rgba(255,77,106,.3);border-radius:var(--r);
+  padding:8px 12px;font-size:12px;margin-bottom:12px;line-height:1.5;
+}
+.auth-submit-btn{
+  width:100%;padding:11px;background:var(--accent);color:#fff;
+  border:none;border-radius:var(--r);font-size:13px;font-weight:600;
+  cursor:pointer;font-family:var(--font);transition:background .15s;margin-top:4px;
+}
+.auth-submit-btn:hover{background:var(--accent2)}
+.auth-submit-btn:disabled{opacity:.6;cursor:not-allowed}
+.auth-link{
+  font-size:11px;color:var(--accent);cursor:pointer;
+  text-decoration:none;background:none;border:none;font-family:var(--font);
+}
+.auth-link:hover{text-decoration:underline}
+.auth-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:14px;flex-wrap:wrap;gap:6px;
+}
+.auth-divider{
+  text-align:center;font-size:11px;color:var(--text3);margin:16px 0;
+}
+
+/* 비밀번호 정책 체크리스트 */
+.pw-policy-box{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:10px 12px;margin-top:6px;
+}
+.pw-policy-title{
+  font-size:10px;color:var(--text3);font-weight:600;
+  margin-bottom:6px;letter-spacing:.5px;
+}
+.pw-policy-item{
+  font-size:11px;color:var(--text3);padding:2px 0;transition:color .15s;
+}
+.pw-policy-item.ok{color:var(--green)}
+.pw-policy-item.fail{color:var(--red)}
+.pw-match-msg{
+  font-size:11px;margin-top:4px;height:16px;
+}
+.pw-match-msg.ok{color:var(--green)}
+.pw-match-msg.fail{color:var(--red)}
+
+/* 비밀번호 표시 토글 */
+.pw-wrap{position:relative}
+.pw-toggle{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:14px;padding:2px;
+}
+.pw-toggle:hover{color:var(--text)}
+
+/* 가입신청 소속 구분 */
+.org-type-group{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;
+}
+.org-type-btn{
+  padding:7px 4px;border:1px solid var(--border);border-radius:var(--r);
+  background:var(--bg3);color:var(--text3);font-size:11px;font-weight:500;
+  cursor:pointer;text-align:center;transition:all .15s;font-family:var(--font);
+}
+.org-type-btn:hover{border-color:var(--border2);color:var(--text)}
+.org-type-btn.on{
+  border-color:var(--accent);background:var(--aglow);color:var(--accent);
+}
+
+/* 승인 대기 화면 */
+#pending-screen{
+  position:fixed;inset:0;background:var(--bg);
+  display:none;align-items:center;justify-content:center;
+  z-index:9000;padding:20px;
+}
+.pending-box{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:var(--rl);padding:40px 32px;width:100%;max-width:400px;
+  text-align:center;
+}
+.pending-icon{font-size:48px;margin-bottom:16px}
+.pending-title{font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px}
+.pending-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:20px}
+.pending-badge{
+  display:inline-block;padding:4px 14px;border-radius:20px;
+  background:var(--yellowbg);color:var(--yellow);
+  border:1px solid rgba(255,179,71,.3);font-size:11px;font-weight:600;
+  margin-bottom:20px;
+}
+
+/* topbar 사용자 이름 */
+#tb-username{
+  font-size:11px;color:var(--text2);
+  padding:3px 8px;background:var(--bg3);
+  border:1px solid var(--border);border-radius:6px;
+  max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* 비밀번호 변경 모달 */
+#chpw-mo .md{max-width:400px}
+
+/* 세션 설정 모달 */
+#session-mo .md{max-width:360px}
+.session-info{
+  font-size:11px;color:var(--text3);line-height:1.6;
+  background:var(--bg3);border-radius:var(--r);padding:8px 10px;margin-bottom:12px;
+}
+
+/* 리셋 성공 메시지 */
+#reset-success{
+  display:none;text-align:center;padding:20px 0;
+}
+.reset-success-icon{font-size:40px;margin-bottom:12px}
+.reset-success-msg{font-size:13px;color:var(--text2);line-height:1.7}
