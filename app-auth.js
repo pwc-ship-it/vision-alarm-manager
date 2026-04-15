@@ -28,9 +28,10 @@ function setSessionMin(min){
 // ══════════════════════════════════════
 //  EmailJS 설정
 // ══════════════════════════════════════
-const EMAILJS_SERVICE_ID  = 'service_p8md6zd';
-const EMAILJS_TEMPLATE_ID = 'template_x6qowo8';
-const EMAILJS_PUBLIC_KEY  = 'sLxfXJSqzf_-t-Nt_';
+const EMAILJS_SERVICE_ID        = 'service_p8md6zd';
+const EMAILJS_TEMPLATE_ID       = 'template_x6qowo8';  // 가입신청 알림 (Admin용)
+const EMAILJS_TEMPLATE_APPROVED = 'template_83hsa5v';  // 승인 알림 (가입자용)
+const EMAILJS_PUBLIC_KEY        = 'sLxfXJSqzf_-t-Nt_';
 
 // ══════════════════════════════════════
 //  비밀번호 정책
@@ -185,6 +186,11 @@ async function onUserSignedIn(user){
 
     // Vision 개인화 필터 적용
     setTimeout(()=>applyVisionPersonalize(), 300);
+
+    // Admin이면 승인대기 건수 자동 확인
+    if(profile.role === 'admin'){
+      setTimeout(()=>checkPendingUsers(), 1000);
+    }
 
     // 앱 초기화
     if(!appInitialized){
@@ -447,14 +453,29 @@ function saveSessionSettings(){
 // ══════════════════════════════════════
 async function sendRegisterNotification(profile){
   try{
-    // Admin 목록 조회
-    const usersData = await fbGet('users');
-    if(!usersData) return;
+    // Admin 목록 조회 — 토큰 없이도 읽을 수 있도록 직접 Firebase DB SDK 사용
+    const DB_URL = 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
+    let admins = [];
 
-    const admins = Object.values(usersData).filter(u =>
-      u.role === 'admin' && u.status === 'approved' && u.email
-    );
-    if(!admins.length) return;
+    try{
+      // Firebase DB SDK로 시도 (토큰 불필요)
+      const db = firebase.database();
+      const snap = await db.ref('users').once('value');
+      const usersData = snap.val();
+      if(usersData){
+        admins = Object.values(usersData).filter(u =>
+          u.role === 'admin' && u.status === 'approved' && u.email
+        );
+      }
+    } catch(e){
+      console.warn('[EmailJS] Admin 목록 조회 실패:', e);
+      // 조회 실패 시 하드코딩된 기본 Admin에게 발송
+      admins = [{ email: 'pwc0758@intekplus.com', name: '박우철' }];
+    }
+
+    if(!admins.length){
+      admins = [{ email: 'pwc0758@intekplus.com', name: '박우철' }];
+    }
 
     const orgTypeLabel = {
       headquarter: '본사',
@@ -709,6 +730,35 @@ async function initApp(){
 //  사용자 관리 (Admin 전용)
 // ══════════════════════════════════════
 
+// topbar 승인대기 뱃지 업데이트
+function updatePendingBadge(cnt){
+  const btn = document.getElementById('user-manage-btn');
+  if(!btn) return;
+  // 기존 뱃지 제거
+  const oldBadge = btn.querySelector('.um-badge');
+  if(oldBadge) oldBadge.remove();
+  // 새 뱃지 추가
+  if(cnt > 0){
+    const badge = document.createElement('span');
+    badge.className = 'um-badge';
+    badge.textContent = cnt;
+    btn.appendChild(badge);
+  }
+}
+
+// 로그인 후 승인대기 건수 자동 확인 (Admin만)
+async function checkPendingUsers(){
+  if(!isAdmin) return;
+  try{
+    const db = firebase.database();
+    const snap = await db.ref('users').once('value');
+    const users = snap.val();
+    if(!users) return;
+    const cnt = Object.values(users).filter(u=>u.status==='pending').length;
+    updatePendingBadge(cnt);
+  } catch(e){}
+}
+
 // 사용자 목록 모달 열기
 async function openUserManage(){
   if(!isAdmin){ showToast('관리자 권한 필요','err'); return; }
@@ -783,13 +833,15 @@ async function renderUserList(){
       </div>`;
     }).join('');
 
-    // 승인대기 건수 표시
+    // 승인대기 건수 표시 (모달 타이틀 + topbar 뱃지)
     const pendingCnt = userList.filter(u=>u.status==='pending').length;
     const cntEl = document.getElementById('um-pending-cnt');
     if(cntEl){
       cntEl.textContent = pendingCnt > 0 ? `승인대기 ${pendingCnt}명` : '';
       cntEl.style.color = pendingCnt > 0 ? 'var(--yellow)' : '';
     }
+    // topbar 버튼 뱃지 업데이트
+    updatePendingBadge(pendingCnt);
 
   } catch(e){
     console.error('[UserManage] 오류:', e);
@@ -817,26 +869,30 @@ async function updateUserStatus(uid, newStatus){
     showToast(`✅ ${newStatus === 'approved' ? '승인' : newStatus === 'rejected' ? '거절' : '정지'} 완료`, 'ok');
     await renderUserList(); // 목록 새로고침
 
-    // 승인 시 EmailJS로 알림 (선택)
+    // 승인 시 가입자에게 승인 알림 이메일 발송
     if(newStatus === 'approved'){
       try{
         const snap = await db.ref('users/' + uid).once('value');
         const profile = snap.val();
         if(profile && profile.email){
+          const orgTypeLabel = {
+            headquarter:'본사', outsource:'외주', customer:'고객사'
+          }[profile.orgType] || profile.orgType;
+
           await emailjs.send(
-            'service_p8md6zd',
-            'template_x6qowo8',
+            EMAILJS_SERVICE_ID,
+            EMAILJS_TEMPLATE_APPROVED,
             {
               to_email:      profile.email,
               name:          'Vision Alarm Manager',
               user_name:     profile.name,
               user_org:      profile.org,
-              user_org_type: profile.orgType,
+              user_org_type: orgTypeLabel,
               user_email:    profile.email,
-              request_time:  '가입 승인 완료'
             },
-            'sLxfXJSqzf_-t-Nt_'
+            EMAILJS_PUBLIC_KEY
           );
+          console.log('[EmailJS] 승인 알림 발송 완료:', profile.email);
         }
       } catch(e){ console.warn('[EmailJS] 승인 알림 실패:', e); }
     }
