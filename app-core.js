@@ -15,7 +15,10 @@ function fbPath(path){
 async function fbGet(path){
   if(!FB_URL) return null;
   try{
-    const r = await fetch(fbPath(path));
+    let url = fbPath(path);
+    const token = await getAuthToken();
+    if(token) url += (url.includes('?')?'&':'?') + 'auth=' + token;
+    const r = await fetch(url);
     if(!r.ok) return null;
     const text = await r.text();
     if(!text || text === 'null') return {};
@@ -23,10 +26,22 @@ async function fbGet(path){
   } catch(e){ console.error('fbGet error:', e); return null; }
 }
 
+async function getAuthToken(){
+  try{
+    if(typeof firebase !== 'undefined' && firebase.apps.length && firebase.auth().currentUser){
+      return await firebase.auth().currentUser.getIdToken();
+    }
+  } catch(e){}
+  return null;
+}
+
 async function fbPatch(path, data){
   if(!FB_URL) return false;
   try{
-    const r = await fetch(fbPath(path), {
+    let url = fbPath(path);
+    const token = await getAuthToken();
+    if(token) url += (url.includes('?')?'&':'?') + 'auth=' + token;
+    const r = await fetch(url, {
       method:'PATCH',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify(data)
@@ -39,7 +54,10 @@ async function fbSet(path, data){
   // PUT = 완전 교체 (배열 저장 시 반드시 사용 — PATCH는 이전 인덱스가 남아 데이터 손상)
   if(!FB_URL) return false;
   try{
-    const r = await fetch(fbPath(path), {
+    let url = fbPath(path);
+    const token = await getAuthToken();
+    if(token) url += (url.includes('?')?'&':'?') + 'auth=' + token;
+    const r = await fetch(url, {
       method:'PUT',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify(data)
@@ -51,7 +69,10 @@ async function fbSet(path, data){
 async function fbDelete(path){
   if(!FB_URL) return false;
   try{
-    const r = await fetch(fbPath(path), { method:'DELETE' });
+    let url = fbPath(path);
+    const token = await getAuthToken();
+    if(token) url += (url.includes('?')?'&':'?') + 'auth=' + token;
+    const r = await fetch(url, { method:'DELETE' });
     return r.ok;
   } catch(e){ console.error('fbDelete error:', e); return false; }
 }
