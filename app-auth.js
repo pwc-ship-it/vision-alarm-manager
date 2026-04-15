@@ -291,11 +291,28 @@ async function doRegister(){
     };
     await fbSet('users/' + uid, profile);
 
+    // Admin 목록 미리 조회 (signOut 전 — 토큰 있는 상태에서)
+    let adminList = [];
+    try{
+      const db = firebase.database();
+      const snap = await db.ref('users').once('value');
+      const usersData = snap.val();
+      if(usersData){
+        adminList = Object.values(usersData).filter(u =>
+          u.role === 'admin' && u.status === 'approved' && u.email
+        );
+      }
+    } catch(e){ console.warn('[Register] Admin 목록 조회 실패:', e); }
+    // 조회 실패 시 기본 Admin 폴백
+    if(!adminList.length){
+      adminList = [{ email: 'pwc0758@intekplus.com', name: '박우철' }];
+    }
+
     // 가입 즉시 로그아웃 (승인 전 접근 차단)
     await firebaseAuth.signOut();
 
-    // Admin들에게 이메일 알림 발송
-    await sendRegisterNotification(profile);
+    // Admin들에게 이메일 알림 발송 (미리 조회한 목록 전달)
+    await sendRegisterNotification(profile, adminList);
 
     // 승인 대기 화면 표시
     showPendingScreen(profile);
@@ -451,28 +468,11 @@ function saveSessionSettings(){
 // ══════════════════════════════════════
 //  EmailJS 가입 알림 발송
 // ══════════════════════════════════════
-async function sendRegisterNotification(profile){
+async function sendRegisterNotification(profile, preloadedAdmins){
   try{
-    // Admin 목록 조회 — 토큰 없이도 읽을 수 있도록 직접 Firebase DB SDK 사용
-    const DB_URL = 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
-    let admins = [];
-
-    try{
-      // Firebase DB SDK로 시도 (토큰 불필요)
-      const db = firebase.database();
-      const snap = await db.ref('users').once('value');
-      const usersData = snap.val();
-      if(usersData){
-        admins = Object.values(usersData).filter(u =>
-          u.role === 'admin' && u.status === 'approved' && u.email
-        );
-      }
-    } catch(e){
-      console.warn('[EmailJS] Admin 목록 조회 실패:', e);
-      // 조회 실패 시 하드코딩된 기본 Admin에게 발송
-      admins = [{ email: 'pwc0758@intekplus.com', name: '박우철' }];
-    }
-
+    // Admin 목록: doRegister에서 미리 조회한 목록 우선 사용
+    // (signOut 후 호출되므로 직접 DB 조회 불가)
+    let admins = preloadedAdmins || [];
     if(!admins.length){
       admins = [{ email: 'pwc0758@intekplus.com', name: '박우철' }];
     }
@@ -775,80 +775,156 @@ async function renderUserList(){
   const body = document.getElementById('um-body');
   if(!body) return;
   body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">⏳ 불러오는 중...</div>';
-
   try{
     const db = firebase.database();
     const snap = await db.ref('users').once('value');
     const users = snap.val();
-
     if(!users){
       body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">등록된 사용자가 없습니다.</div>';
       return;
     }
-
     const userList = Object.values(users);
-    // 상태별 정렬: pending 먼저, 그 다음 approved, 나머지
-    userList.sort((a,b)=>{
-      const order = {pending:0, approved:1, suspended:2, rejected:3};
-      return (order[a.status]??9) - (order[b.status]??9);
+    const now = new Date();
+    const statusLabel = {pending:'승인대기',approved:'승인',suspended:'정지',rejected:'거절'};
+    const statusColor = {pending:'var(--yellow)',approved:'var(--green)',suspended:'var(--red)',rejected:'var(--text3)'};
+
+    // 소속구분별 그룹
+    const groups = {
+      headquarter: userList.filter(u=>u.orgType==='headquarter'),
+      outsource:   userList.filter(u=>u.orgType==='outsource'),
+      customer:    userList.filter(u=>u.orgType==='customer'),
+    };
+    // 각 그룹 정렬: 승인대기 먼저 → 이름순
+    Object.keys(groups).forEach(k=>{
+      groups[k].sort((a,b)=>{
+        const pa=a.status==='pending'?0:1, pb=b.status==='pending'?0:1;
+        if(pa!==pb) return pa-pb;
+        return (a.name||'').localeCompare(b.name||'','ko');
+      });
     });
 
-    const orgTypeLabel = { headquarter:'본사', outsource:'외주', customer:'고객사' };
-    const statusLabel  = { pending:'승인대기', approved:'승인', suspended:'정지', rejected:'거절' };
-    const statusColor  = { pending:'var(--yellow)', approved:'var(--green)', suspended:'var(--red)', rejected:'var(--text3)' };
+    // 마지막 접속 상대시간
+    function lastLoginText(v){
+      if(!v) return '접속 없음';
+      const diff=Math.floor((now-new Date(v))/86400000);
+      if(diff===0) return '오늘';
+      if(diff===1) return '어제';
+      if(diff<30)  return diff+'일 전';
+      if(diff<365) return Math.floor(diff/30)+'개월 전';
+      return Math.floor(diff/365)+'년 전';
+    }
+    function isInactive(v){ return !v||(now-new Date(v))>30*86400000; }
 
-    body.innerHTML = userList.map(u => {
-      const isSelf = u.uid === currentUser?.uid;
-      const lastLogin = u.lastLogin ? u.lastLogin.slice(0,16).replace('T',' ') : '없음';
-      const orgLabel  = orgTypeLabel[u.orgType] || u.orgType;
-      const stLabel   = statusLabel[u.status]   || u.status;
-      const stColor   = statusColor[u.status]   || 'var(--text3)';
-
+    // 사용자 카드
+    function makeUserCard(u){
+      const isSelf  = u.uid===currentUser?.uid;
+      const inactive= isInactive(u.lastLogin)&&u.status==='approved';
+      const stColor = statusColor[u.status]||'var(--text3)';
+      const stLabel = statusLabel[u.status]||u.status;
       return `
-      <div class="um-row" id="um-${u.uid}">
+      <div class="um-row ${u.status==='pending'?'um-pending':''}" id="um-${u.uid}">
         <div class="um-info">
           <div class="um-name">
             ${esc(u.name)}
-            ${isSelf ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">(나)</span>' : ''}
-            ${u.role==='admin' ? '<span style="font-size:10px;color:var(--yellow);margin-left:4px">ADMIN</span>' : ''}
+            ${isSelf?'<span class="um-tag um-tag-me">나</span>':''}
+            ${u.role==='admin'?'<span class="um-tag um-tag-admin">ADMIN</span>':''}
+            ${inactive?'<span class="um-tag um-tag-inactive">비활성</span>':''}
           </div>
           <div class="um-detail">
-            <span>${esc(u.email)}</span>
-            <span>${esc(u.org)} · ${orgLabel}</span>
-            <span>마지막 로그인: ${lastLogin}</span>
+            <span class="um-email" onclick="copyEmail('${esc(u.email)}')" title="클릭하여 복사">
+              ${esc(u.email)}<span class="um-copy-icon"> 📋</span>
+            </span>
+            <span>${esc(u.org)}</span>
+            <span class="${inactive?'um-inactive-txt':''}">🕐 ${lastLoginText(u.lastLogin)}</span>
           </div>
         </div>
         <div class="um-actions">
           <span class="um-status" style="color:${stColor}">${stLabel}</span>
-          ${!isSelf ? `
-            ${u.status==='pending'  ? `<button class="btn sm primary" onclick="updateUserStatus('${u.uid}','approved')">✅ 승인</button>` : ''}
-            ${u.status==='pending'  ? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','rejected')" style="color:var(--red);border-color:rgba(255,77,106,.3)">❌ 거절</button>` : ''}
-            ${u.status==='approved' ? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','suspended')" style="color:var(--red);border-color:rgba(255,77,106,.3)">🚫 정지</button>` : ''}
-            ${u.status==='suspended'? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','approved')">🔓 정지해제</button>` : ''}
-            ${u.status==='rejected' ? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','approved')">↩️ 재승인</button>` : ''}
-            ${u.role!=='admin' ? `<button class="btn sm" onclick="updateUserRole('${u.uid}','admin')" style="color:var(--yellow);border-color:rgba(255,179,71,.3)">⭐ Admin</button>` : ''}
-            ${u.role==='admin' ? `<button class="btn sm" onclick="updateUserRole('${u.uid}','member')" style="color:var(--text3)">👤 일반</button>` : ''}
-          ` : '<span style="font-size:10px;color:var(--text3)">본인 계정</span>'}
+          ${!isSelf?`
+            ${u.status==='pending'  ?`<button class="btn sm primary" onclick="updateUserStatus('${u.uid}','approved')">✅ 승인</button>`:''}
+            ${u.status==='pending'  ?`<button class="btn sm" onclick="updateUserStatus('${u.uid}','rejected')" style="color:var(--red);border-color:rgba(255,77,106,.3)">❌ 거절</button>`:''}
+            ${u.status==='approved' ?`<button class="btn sm" onclick="updateUserStatus('${u.uid}','suspended')" style="color:var(--red);border-color:rgba(255,77,106,.3)">🚫 정지</button>`:''}
+            ${u.status==='suspended'?`<button class="btn sm" onclick="updateUserStatus('${u.uid}','approved')">🔓 정지해제</button>`:''}
+            ${u.status==='rejected' ?`<button class="btn sm" onclick="updateUserStatus('${u.uid}','approved')">↩️ 재승인</button>`:''}
+            ${u.role!=='admin'?`<button class="btn sm" onclick="updateUserRole('${u.uid}','admin')" style="color:var(--yellow);border-color:rgba(255,179,71,.3)">⭐ Admin</button>`:''}
+            ${u.role==='admin'?`<button class="btn sm" onclick="updateUserRole('${u.uid}','member')" style="color:var(--text3)">👤 일반</button>`:''}
+          `:'<span style="font-size:10px;color:var(--text3)">본인 계정</span>'}
         </div>
       </div>`;
-    }).join('');
-
-    // 승인대기 건수 표시 (모달 타이틀 + topbar 뱃지)
-    const pendingCnt = userList.filter(u=>u.status==='pending').length;
-    const cntEl = document.getElementById('um-pending-cnt');
-    if(cntEl){
-      cntEl.textContent = pendingCnt > 0 ? `승인대기 ${pendingCnt}명` : '';
-      cntEl.style.color = pendingCnt > 0 ? 'var(--yellow)' : '';
     }
-    // topbar 버튼 뱃지 업데이트
+
+    // 섹션 헤더
+    function makeSectionHeader(label, arr, orgKey){
+      if(!arr.length) return '';
+      const pending  =arr.filter(u=>u.status==='pending').length;
+      const approved =arr.filter(u=>u.status==='approved').length;
+      const suspended=arr.filter(u=>u.status==='suspended').length;
+      return `
+      <div class="um-section-hdr">
+        <span class="um-section-title">${label}</span>
+        <span class="um-section-stats">
+          <span class="um-stat-badge um-stat-total">전체 ${arr.length}</span>
+          ${pending  ?`<span class="um-stat-badge um-stat-pending">대기 ${pending}</span>`:''}
+          <span class="um-stat-badge um-stat-approved">승인 ${approved}</span>
+          ${suspended?`<span class="um-stat-badge um-stat-suspended">정지 ${suspended}</span>`:''}
+        </span>
+        ${pending?`<button class="btn sm primary" style="margin-left:auto;font-size:10px" onclick="approveAllPending('${label}','${orgKey}')">✅ 대기 전체 승인</button>`:''}
+      </div>`;
+    }
+
+    let html='';
+    const defs=[{key:'headquarter',label:'🏢 본사'},{key:'outsource',label:'🔧 외주'},{key:'customer',label:'🏭 고객사'}];
+    for(const {key,label} of defs){
+      if(!groups[key].length) continue;
+      html += makeSectionHeader(label, groups[key], key);
+      html += groups[key].map(makeUserCard).join('');
+    }
+    body.innerHTML = html||'<div style="color:var(--text3);padding:20px">사용자가 없습니다.</div>';
+
+    const pendingCnt=userList.filter(u=>u.status==='pending').length;
+    const cntEl=document.getElementById('um-pending-cnt');
+    if(cntEl){ cntEl.textContent=pendingCnt>0?`승인대기 ${pendingCnt}명`:''; cntEl.style.color=pendingCnt>0?'var(--yellow)':''; }
     updatePendingBadge(pendingCnt);
 
   } catch(e){
-    console.error('[UserManage] 오류:', e);
-    body.innerHTML = `<div style="color:var(--red);padding:20px">오류: ${e.message}</div>`;
+    console.error('[UserManage]',e);
+    body.innerHTML=`<div style="color:var(--red);padding:20px">오류: ${e.message}</div>`;
   }
 }
 
+// 이메일 복사
+function copyEmail(email){
+  navigator.clipboard.writeText(email)
+    .then(()=>showToast('이메일 복사됨 📋','ok'))
+    .catch(()=>showToast(email,'ok'));
+}
+
+// 소속별 대기자 일괄 승인
+async function approveAllPending(label, orgKey){
+  if(!confirm(label+' 섹션의 승인대기 사용자를 모두 승인하시겠습니까?')) return;
+  try{
+    const db=firebase.database();
+    const snap=await db.ref('users').once('value');
+    const users=snap.val(); if(!users) return;
+    const targets=Object.values(users).filter(u=>u.status==='pending'&&u.orgType===orgKey);
+    let count=0;
+    for(const u of targets){
+      await db.ref('users/'+u.uid+'/status').set('approved');
+      try{
+        const orgLbl={headquarter:'본사',outsource:'외주',customer:'고객사'}[u.orgType]||u.orgType;
+        await emailjs.send(EMAILJS_SERVICE_ID,EMAILJS_TEMPLATE_APPROVED,{
+          to_email:u.email,name:'Vision Alarm Manager',
+          user_name:u.name,user_org:u.org,user_org_type:orgLbl,user_email:u.email,
+        },EMAILJS_PUBLIC_KEY);
+      } catch(e){ console.warn('[EmailJS]',e); }
+      count++;
+    }
+    addAudit('일괄 승인',label,currentUserProfile.name,'',count+'명');
+    await saveAudit();
+    showToast('✅ '+count+'명 승인 완료','ok');
+    await renderUserList();
+  } catch(e){ showToast('❌ '+e.message,'err'); }
+}
 // 사용자 상태 변경 (승인/거절/정지)
 async function updateUserStatus(uid, newStatus){
   const statusMsg = {
