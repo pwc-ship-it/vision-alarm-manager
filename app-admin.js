@@ -592,3 +592,179 @@ function handleUpload(event){
     showToast(`${added}${t('added')}`,'ok');
   }
 }
+
+// ══════════════════════════════════════
+//  BACKUP / RESTORE
+// ══════════════════════════════════════
+
+function openBackupModal(){
+  if(!isAdmin){ showToast('관리자 권한 필요','err'); return; }
+  const mo = document.getElementById('backup-mo');
+  if(mo) mo.classList.add('open');
+}
+function closeBackupModal(){
+  const mo = document.getElementById('backup-mo');
+  if(mo) mo.classList.remove('open');
+}
+
+async function exportBackup(){
+  showToast('⏳ 백업 데이터 수집 중...','');
+  let source = 'localStorage';
+  let data = {
+    actions:       gS('vam_actions',{}),
+    customAlarms:  gS('vam_custom_alarms',[]),
+    alarmEdits:    gS('vam_alarm_edits',{}),
+    auditLog:      gS('vam_audit',[]),
+    customVisions: gS('vam_custom_visions',[]),
+    customTypes:   gS('vam_custom_types',[]),
+    siteUnits:     gS('vam_site_units',[])
+  };
+  if(fbOnline){
+    try{
+      const [actD,editD,auditD,caD,cvD,ctD,suD] = await Promise.all([
+        fbGet('actions'),fbGet('alarmEdits'),fbGet('auditLog'),
+        fbGet('customAlarms'),fbGet('customVisions'),fbGet('customTypes'),fbGet('siteUnits')
+      ]);
+      if(actD  && typeof actD==='object')  data.actions       = actD;
+      if(editD && typeof editD==='object') data.alarmEdits    = editD;
+      if(auditD) data.auditLog     = Array.isArray(auditD)?auditD:Object.values(auditD);
+      if(caD)    data.customAlarms = Array.isArray(caD)?caD:Object.values(caD).filter(Boolean);
+      if(cvD)    data.customVisions= Array.isArray(cvD)?cvD:Object.values(cvD).filter(Boolean);
+      if(ctD)    data.customTypes  = Array.isArray(ctD)?ctD:Object.values(ctD).filter(Boolean);
+      if(suD)    data.siteUnits    = Array.isArray(suD)?suD:Object.values(suD).filter(x=>x&&typeof x==='object');
+      source = 'Firebase';
+    } catch(e){ source = 'localStorage (Firebase 오류)'; }
+  }
+  const actCount = Object.values(data.actions||{}).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);
+  const backup = {
+    _date: new Date().toISOString(), _version: 2,
+    _source: source,
+    _stats: { actions: actCount, customAlarms: (data.customAlarms||[]).length },
+    ...data
+  };
+  const blob = new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vam_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 10000);
+  showToast(`✅ 백업 완료 (${source}) — 조치방안 ${actCount}건`,'ok');
+}
+
+async function importBackup(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const fnEl = document.getElementById('restore-file-name');
+  if(fnEl) fnEl.textContent = file.name;
+  event.target.value = '';
+  try{
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    if(!backup._version) throw new Error('올바른 백업 파일이 아닙니다');
+    const backupDate = (backup._date||'').slice(0,16).replace('T',' ')||'날짜 불명';
+    const src = backup._source||'?';
+    let cAct=0, cAlarm=0, cEdit=0;
+    if(backup.actions && typeof backup.actions==='object'){
+      Object.entries(backup.actions).forEach(([k,arr])=>{
+        if(!Array.isArray(arr)) return;
+        const cur = actions[k];
+        if(!Array.isArray(cur)) return;
+        const curKeys = new Set(cur.map(x=>(x.author||'')+'|'+(x.date||'')));
+        arr.forEach(x=>{ if(curKeys.has((x.author||'')+'|'+(x.date||''))) cAct++; });
+      });
+    }
+    if(Array.isArray(backup.customAlarms)){
+      const curIds = new Set(customAlarms.map(a=>a.id));
+      backup.customAlarms.forEach(a=>{ if(curIds.has(a.id)) cAlarm++; });
+    }
+    if(backup.alarmEdits && typeof backup.alarmEdits==='object'){
+      Object.keys(backup.alarmEdits).forEach(k=>{ if(alarmEdits[k]) cEdit++; });
+    }
+    const step1 = confirm(
+      `📂 백업: ${backupDate} (출처: ${src})\n\n`+
+      `충돌 항목:\n  조치방안: ${cAct}건\n  커스텀 알람: ${cAlarm}건\n  알람 수정이력: ${cEdit}건\n\n`+
+      `[확인] 현재 우선 (충돌 시 현재 유지, 신규만 추가)\n`+
+      `[취소] 다음 단계 선택`
+    );
+    let mode;
+    if(step1){ mode='keep-current'; }
+    else {
+      const step2 = confirm(
+        `[확인] 백업 우선 (충돌 시 백업으로 교체)\n`+
+        `[취소] 완전 덮어쓰기`
+      );
+      mode = step2 ? 'backup-first' : 'overwrite';
+    }
+    if(backup.actions && typeof backup.actions==='object'){
+      if(mode==='overwrite'){ actions=backup.actions; }
+      else {
+        const merged={...actions};
+        Object.entries(backup.actions).forEach(([k,arr])=>{
+          if(!Array.isArray(arr)) return;
+          const existing=Array.isArray(merged[k])?merged[k]:[];
+          const curKeys=new Set(existing.map(x=>(x.author||'')+'|'+(x.date||'')));
+          if(mode==='keep-current'){
+            merged[k]=[...existing,...arr.filter(x=>!curKeys.has((x.author||'')+'|'+(x.date||'')))];
+          } else {
+            const bkKeys=new Set(arr.map(x=>(x.author||'')+'|'+(x.date||'')));
+            merged[k]=[...arr,...existing.filter(x=>!bkKeys.has((x.author||'')+'|'+(x.date||'')))];
+          }
+        });
+        actions=merged;
+      }
+      await saveActions();
+    }
+    if(Array.isArray(backup.customAlarms)){
+      if(mode==='overwrite'){ customAlarms=backup.customAlarms; }
+      else {
+        const curIds=new Set(customAlarms.map(a=>a.id));
+        if(mode==='keep-current'){
+          customAlarms=[...customAlarms,...backup.customAlarms.filter(a=>!curIds.has(a.id))];
+        } else {
+          const bkIds=new Set(backup.customAlarms.map(a=>a.id));
+          customAlarms=[...backup.customAlarms,...customAlarms.filter(a=>!bkIds.has(a.id))];
+        }
+      }
+      await saveCustomAlarms();
+    }
+    if(backup.alarmEdits && typeof backup.alarmEdits==='object'){
+      alarmEdits = mode==='overwrite' ? backup.alarmEdits
+        : mode==='keep-current' ? {...backup.alarmEdits,...alarmEdits}
+        : {...alarmEdits,...backup.alarmEdits};
+      await saveAlarmEdits();
+    }
+    if(Array.isArray(backup.auditLog)){
+      if(mode==='overwrite'){ auditLog=backup.auditLog; }
+      else {
+        const curKeys=new Set(auditLog.map(h=>(h.date||'')+'|'+(h.type||'')+'|'+(h.target||'')));
+        auditLog=[...auditLog,...backup.auditLog.filter(h=>!curKeys.has((h.date||'')+'|'+(h.type||'')+'|'+(h.target||'')))].sort((a,b)=>a.date>b.date?1:-1);
+      }
+      await saveAudit();
+    }
+    if(Array.isArray(backup.customVisions)){ customVisions=[...new Set([...customVisions,...backup.customVisions])]; await saveCustomVisions(); }
+    if(Array.isArray(backup.customTypes)){   customTypes=[...new Set([...customTypes,...backup.customTypes])];       await saveCustomTypes(); }
+    if(Array.isArray(backup.siteUnits)){
+      if(mode==='overwrite'){ siteUnits=backup.siteUnits; }
+      else {
+        const merged=[...siteUnits];
+        backup.siteUnits.forEach(bSu=>{
+          const exist=merged.find(x=>x.site===bSu.site);
+          if(exist){ exist.units=[...new Set([...exist.units,...bSu.units])]; }
+          else { merged.push(bSu); }
+        });
+        siteUnits=merged;
+      }
+      await saveSiteUnits();
+    }
+    addAudit('백업 복원','backup-import','Admin','',mode+' / '+backupDate);
+    await saveAudit();
+    rebuildAlarms();
+    applyFilters(); updateStats(); renderRight();
+    if(curAlarm){ const u=alarms.find(x=>x.id===curAlarm.id); if(u){curAlarm=u;renderDetail(u);} else {curAlarm=null;document.getElementById('dp').classList.remove('open');} }
+    const modeLabel={'keep-current':'현재 우선','backup-first':'백업 우선','overwrite':'완전 덮어쓰기'}[mode]||mode;
+    showToast(`✅ 복원 완료 (${modeLabel})`,'ok');
+  } catch(e){
+    showToast('❌ 복원 실패: '+e.message,'err');
+    console.error('[importBackup]',e);
+  }
+}
