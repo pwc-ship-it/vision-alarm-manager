@@ -153,10 +153,25 @@ async function initFirebase(){
   setDbStatus('loading');
   try{
     // Auth 토큰 포함해서 연결 테스트
+    // 루트(/) 대신 현재 사용자 프로필 경로로 테스트 (보안 규칙 호환)
     const token = await getAuthToken();
-    const testUrl = token
-      ? FB_URL + '/.json?shallow=true&auth=' + token
-      : FB_URL + '/.json?shallow=true';
+    if(!token){
+      console.warn('[Firebase] 토큰 없음 — 오프라인 모드');
+      fbOnline = false; setDbStatus('offline');
+      applyFilters(); updateStats(); renderRight(); return;
+    }
+
+    // 현재 사용자 UID로 테스트 경로 구성
+    const uid = typeof firebase !== 'undefined'
+      ? firebase.auth().currentUser?.uid
+      : null;
+
+    // uid가 있으면 users/{uid}, 없으면 translationStatus (인증만 있으면 읽기 가능)
+    const testPath = uid
+      ? `/users/${uid}.json?auth=${token}`
+      : `/translationStatus.json?auth=${token}`;
+
+    const testUrl = FB_URL + testPath;
     const r = await fetch(testUrl);
     console.log('[Firebase] 응답 상태:', r.status, r.ok);
     if(!r.ok){
