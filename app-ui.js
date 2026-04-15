@@ -83,31 +83,69 @@ function mobNav(page,btn){
       <button class="btn" style="margin-top:12px" onclick="mobNav('list',document.querySelectorAll('.mn')[0])">${t('mob_back')}</button>`;
 
   } else if(page==='more'){
+    const profile = typeof currentUserProfile !== 'undefined' ? currentUserProfile : null;
+    const adm     = typeof isAdmin !== 'undefined' ? isAdmin : false;
+    const uname   = profile ? profile.name : '';
+    const orgLbl  = profile ? ({headquarter:'본사',outsource:'외주',customer:'고객사'}[profile.orgType]||profile.orgType) : '';
+    const btnStyle = 'width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px';
+
     document.getElementById('mob-sheet').style.display='flex';
     document.getElementById('mob-sheet').innerHTML=`
       <div class="sbl" style="margin-bottom:4px">⚙️ ${currentLang==='en'?'More':'더보기'}</div>
 
+      ${profile ? `
+      <!-- 사용자 정보 -->
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(uname)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(orgLbl)} · ${esc(profile.email||'')}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;${adm?'background:rgba(255,179,71,.15);color:var(--yellow);border:1px solid rgba(255,179,71,.3)':'background:var(--aglow);color:var(--accent);border:1px solid rgba(79,124,255,.3)'}">${adm?'ADMIN':'VIEWER'}</span>
+      </div>` : ''}
+
+      <!-- 알람 추가 (고객사 제외) -->
+      ${!profile || profile.orgType !== 'customer' ? `
       <button class="btn primary" style="width:100%;text-align:left;padding:12px 14px;font-size:13px" onclick="closeMoreSheet();openAddAlarmModal()">
         ➕ ${t('btn_add_alarm')}
+      </button>` : ''}
+
+      <!-- Vision 필터 -->
+      <button class="btn" style="${btnStyle}" onclick="closeMoreSheet();openVisionPersonalize()">
+        🔭 Vision 필터 설정
       </button>
 
-      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px" onclick="closeMoreSheet();toggleLang()">
+      <!-- Admin 전용 -->
+      ${adm ? `
+      <button class="btn" style="${btnStyle};border-color:rgba(255,179,71,.3);color:var(--yellow)" onclick="closeMoreSheet();openUserManage()">
+        👥 사용자 관리
+        ${typeof checkPendingUsers !== 'undefined' ? '' : ''}
+      </button>
+      <button class="btn" style="${btnStyle};border-color:rgba(255,179,71,.3);color:var(--yellow)" onclick="closeMoreSheet();openBackupModal()">
+        💾 백업 / 복원
+      </button>
+      <button class="btn" style="${btnStyle}" onclick="closeMoreSheet();openSessionSettings()">
+        ⏱ 세션 설정
+      </button>` : ''}
+
+      <!-- 공통 기능 -->
+      <button class="btn" style="${btnStyle}" onclick="closeMoreSheet();toggleLang()">
         🌐 ${currentLang==='en'?'Switch to Korean (KO)':'Switch to English (EN)'}
       </button>
 
-      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px" onclick="closeMoreSheet();openFbSetup()">
+      <button class="btn" style="${btnStyle}" onclick="closeMoreSheet();openFbSetup()">
         ⚙️ Firebase ${currentLang==='en'?'Setup':'설정'}
         ${fbOnline?'<span style="font-size:10px;color:var(--green);margin-left:6px">● '+t('db_online')+'</span>':'<span style="font-size:10px;color:var(--red);margin-left:6px">● '+t('db_offline')+'</span>'}
       </button>
 
-      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px" onclick="closeMoreSheet();showQR()">
+      <button class="btn" style="${btnStyle}" onclick="closeMoreSheet();showQR()">
         📱 QR ${currentLang==='en'?'Code':'코드'}
       </button>
 
-      <button class="btn" style="width:100%;text-align:left;padding:12px 14px;font-size:13px;margin-top:2px;${isAdmin?'border-color:var(--yellow);color:var(--yellow)':''}" onclick="closeMoreSheet();toggleAdmin()">
-        👤 ${isAdmin?(currentLang==='en'?'Switch to Viewer':'뷰어로 전환'):(currentLang==='en'?'Switch to Admin':'관리자로 전환')}
-        <span style="font-size:10px;margin-left:6px;opacity:.7">${isAdmin?'ADMIN':'VIEWER'}</span>
-      </button>
+      <!-- 로그아웃 -->
+      ${profile ? `
+      <button class="btn" style="${btnStyle};border-color:rgba(255,77,106,.3);color:var(--red)" onclick="closeMoreSheet();signOut()">
+        🚪 로그아웃
+      </button>` : ''}
 
       <div style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
         <button class="btn ghost" style="width:100%;padding:10px" onclick="closeMoreSheet()">
