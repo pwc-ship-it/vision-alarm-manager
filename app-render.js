@@ -382,9 +382,26 @@ function renderDetail(a){
             <input type="text" id="ac-auth" placeholder="${t('name_required')}" value="${esc(savedAuthor)}" maxlength="20">
             <input type="text" id="ac-site" placeholder="${t('site_optional')}" value="${esc(savedSite)}" maxlength="20">
           </div>
-          <textarea id="ac-txt" placeholder="${t('action_placeholder')}" rows="4"></textarea>
-          <input type="text" id="ac-link" placeholder="${t('ref_link')}" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%">
-          <div class="fr" style="align-items:center">
+          <div class="ac-fields">
+            <div class="ac-field-row">
+              <label class="ac-field-lbl ac-symptom-lbl">🔴 증상</label>
+              <textarea id="ac-symptom" placeholder="어떤 증상이 발생했나요?" rows="2" class="ac-field-ta"></textarea>
+            </div>
+            <div class="ac-field-row">
+              <label class="ac-field-lbl ac-cause-lbl">🔍 원인</label>
+              <textarea id="ac-cause" placeholder="원인이 무엇인지 확인한 내용" rows="2" class="ac-field-ta"></textarea>
+            </div>
+            <div class="ac-field-row">
+              <label class="ac-field-lbl ac-action-lbl">🔧 조치</label>
+              <textarea id="ac-action" placeholder="어떻게 조치했나요? (절차 포함)" rows="2" class="ac-field-ta"></textarea>
+            </div>
+            <div class="ac-field-row">
+              <label class="ac-field-lbl ac-result-lbl">✅ 결과</label>
+              <textarea id="ac-result" placeholder="조치 후 결과는?" rows="2" class="ac-field-ta"></textarea>
+            </div>
+          </div>
+          <input type="text" id="ac-link" placeholder="${t('ref_link')}" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%;margin-top:4px">
+          <div class="fr" style="align-items:center;margin-top:4px">
             <select id="ac-st">
               <option value="">${t('status_unset')}</option>
               <option value="default">${t('status_default')}</option>
@@ -407,9 +424,35 @@ function actCard(ac,k,i,allActs){
   const sCls=SCLS[ac.status||'']||'sp none';
   const sLbl=slbl(ac.status);
   const best=helpful>=3&&helpful===Math.max(...allActs.map(a=>a&&a.helpful||0))&&allActs.length>1;
-  // ac.text_en: EN 모드에서 DeepL 번역본이 있으면 사용
-  const displayText = (currentLang==='en' && ac.text_en) ? ac.text_en : ac.text;
-  const linkHtml=ac.link?`<a href="${esc(ac.link)}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent);display:inline-flex;align-items:center;gap:3px;margin-top:5px;text-decoration:none;background:var(--aglow);padding:2px 8px;border-radius:4px;border:1px solid rgba(79,124,255,.2)">${t('ref_link_open')}</a>`:'';
+  const linkHtml = ac.link
+    ? `<a href="${esc(ac.link)}" target="_blank" rel="noopener" class="ac-link-btn">${t('ref_link_open')}</a>`
+    : '';
+
+  // 신규 4개 필드 vs 기존 text 필드 구분
+  const isNewFormat = ac.symptom || ac.cause || ac.action || ac.result;
+
+  let contentHtml = '';
+  if(isNewFormat){
+    const fields = [
+      { label:'🔴 증상', val: ac.symptom, cls:'ac-f-symptom' },
+      { label:'🔍 원인', val: ac.cause,   cls:'ac-f-cause'   },
+      { label:'🔧 조치', val: ac.action,  cls:'ac-f-action'  },
+      { label:'✅ 결과', val: ac.result,  cls:'ac-f-result'  },
+    ];
+    contentHtml = `<div class="ac-fields-view">` +
+      fields.filter(f=>f.val).map(f=>
+        `<div class="ac-fv-row ${f.cls}">
+          <span class="ac-fv-lbl">${f.label}</span>
+          <span class="ac-fv-val">${esc(f.val)}</span>
+        </div>`
+      ).join('') +
+      `</div>`;
+  } else {
+    // 기존 데이터: text 필드 그대로 표시
+    const displayText = (currentLang==='en' && ac.text_en) ? ac.text_en : ac.text;
+    contentHtml = `<div class="ac-txt ac-legacy"><span class="ac-legacy-badge">기존</span>${esc(displayText)}</div>`;
+  }
+
   return `<div class="ac${best?' best':''}" id="ac-${k}-${i}">
     ${best?`<span class="best-b">★ Best</span>`:''}
     <div class="ac-meta">
@@ -421,7 +464,7 @@ function actCard(ac,k,i,allActs){
         ${isAdmin?`<button onclick="deleteAction('${k}',${i})" style="background:none;border:1px solid rgba(255,77,106,.3);border-radius:4px;color:var(--red);font-size:10px;padding:1px 7px;cursor:pointer;font-family:var(--font)" title="${t('delete_admin')}">${t('delete_admin')}</button>`:''}
       </span>
     </div>
-    <div class="ac-txt">${esc(displayText)}</div>
+    ${contentHtml}
     ${linkHtml}
     <div class="ac-foot">
       <span class="${sCls}">${sLbl}</span>
@@ -435,12 +478,37 @@ function showEditAction(k,idx){
   const card=document.getElementById(`ac-${k}-${idx}`); if(!card) return;
   const existing=card.querySelector('.ac-edit-form');
   if(existing){ existing.remove(); return; }
+
+  const isNewFmt = ac.symptom || ac.cause || ac.action || ac.result;
+  const inpStyle = 'background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:7px;width:100%;resize:vertical';
+
   const form=document.createElement('div');
   form.className='ac-edit-form';
   form.style.cssText='margin-top:8px;padding:10px;background:var(--bg4);border-radius:var(--r);border:1px solid var(--border2);display:flex;flex-direction:column;gap:6px';
   form.innerHTML=`
     <div style="font-size:10px;color:var(--yellow);font-weight:500">${t('action_edit_title')}</div>
-    <textarea id="ea-txt-${k}-${idx}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:7px;width:100%;min-height:80px;resize:vertical" >${esc(ac.text)}</textarea>
+    ${isNewFmt ? `
+      <div class="ac-fields">
+        <div class="ac-field-row">
+          <label class="ac-field-lbl ac-symptom-lbl">🔴 증상</label>
+          <textarea id="ea-symptom-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.symptom||'')}</textarea>
+        </div>
+        <div class="ac-field-row">
+          <label class="ac-field-lbl ac-cause-lbl">🔍 원인</label>
+          <textarea id="ea-cause-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.cause||'')}</textarea>
+        </div>
+        <div class="ac-field-row">
+          <label class="ac-field-lbl ac-action-lbl">🔧 조치</label>
+          <textarea id="ea-action-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.action||'')}</textarea>
+        </div>
+        <div class="ac-field-row">
+          <label class="ac-field-lbl ac-result-lbl">✅ 결과</label>
+          <textarea id="ea-result-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.result||'')}</textarea>
+        </div>
+      </div>
+    ` : `
+      <textarea id="ea-txt-${k}-${idx}" style="${inpStyle};min-height:80px">${esc(ac.text||'')}</textarea>
+    `}
     <input type="text" id="ea-link-${k}-${idx}" placeholder="${t('ref_link')}" value="${esc(ac.link||'')}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 9px;width:100%">
     <div style="display:flex;gap:5px;align-items:center">
       <select id="ea-st-${k}-${idx}" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--font);font-size:12px;padding:5px 8px;flex:1">
@@ -458,15 +526,41 @@ function showEditAction(k,idx){
 
 async function saveEditAction(k,idx){
   const ac=actions[k]?.[idx]; if(!ac) return;
-  const txt=document.getElementById(`ea-txt-${k}-${idx}`)?.value.trim();
-  const lnk=document.getElementById(`ea-link-${k}-${idx}`)?.value.trim();
-  const st=document.getElementById(`ea-st-${k}-${idx}`)?.value;
-  if(!txt||txt.length<5){ showToast(currentLang==='en'?'Enter at least 5 characters':'5자 이상 입력하세요','err'); return; }
-  const before=ac.text.slice(0,60);
-  ac.text=txt; ac.link=lnk; ac.status=st;
-  ac.edited=new Date().toISOString().slice(0,16).replace('T',' ');
-  await saveActions();
-  addAudit('조치방안 수정',k,ac.author,before,txt.slice(0,60));
+  const lnk = document.getElementById(`ea-link-${k}-${idx}`)?.value.trim();
+  const st  = document.getElementById(`ea-st-${k}-${idx}`)?.value;
+  const isNewFmt = ac.symptom || ac.cause || ac.action || ac.result;
+
+  if(isNewFmt){
+    const symptom = document.getElementById(`ea-symptom-${k}-${idx}`)?.value.trim()||'';
+    const cause   = document.getElementById(`ea-cause-${k}-${idx}`)?.value.trim()||'';
+    const action  = document.getElementById(`ea-action-${k}-${idx}`)?.value.trim()||'';
+    const result  = document.getElementById(`ea-result-${k}-${idx}`)?.value.trim()||'';
+    if(!symptom && !cause && !action && !result){
+      showToast('하나 이상 입력하세요','err'); return;
+    }
+    const before = ac.text?.slice(0,60)||'';
+    ac.symptom = symptom; ac.cause = cause;
+    ac.action  = action;  ac.result = result;
+    ac.link = lnk; ac.status = st;
+    ac.text = [
+      symptom?'증상: '+symptom:'',
+      cause  ?'원인: '+cause  :'',
+      action ?'조치: '+action :'',
+      result ?'결과: '+result :'',
+    ].filter(Boolean).join('
+');
+    ac.edited = new Date().toISOString().slice(0,16).replace('T',' ');
+    await saveActions();
+    addAudit('조치방안 수정',k,ac.author,before,ac.text.slice(0,60));
+  } else {
+    const txt = document.getElementById(`ea-txt-${k}-${idx}`)?.value.trim();
+    if(!txt||txt.length<5){ showToast(currentLang==='en'?'Enter at least 5 characters':'5자 이상 입력하세요','err'); return; }
+    const before = ac.text?.slice(0,60)||'';
+    ac.text=txt; ac.link=lnk; ac.status=st;
+    ac.edited=new Date().toISOString().slice(0,16).replace('T',' ');
+    await saveActions();
+    addAudit('조치방안 수정',k,ac.author,before,txt.slice(0,60));
+  }
   await saveAudit();
   if(curAlarm) renderDetail(curAlarm);
   renderRight(); if(allActOpen) renderAllActions();
@@ -527,25 +621,50 @@ async function markHelpful(k,idx){
 //  ADD ACTION
 // ══════════════════════════════════════
 async function addAction(k){
-  const author=document.getElementById('ac-auth').value.trim();
-  const site=document.getElementById('ac-site').value.trim();
-  const text=document.getElementById('ac-txt').value.trim();
-  const status=document.getElementById('ac-st').value;
-  const link=(document.getElementById('ac-link')?.value||'').trim();
+  const author  = document.getElementById('ac-auth').value.trim();
+  const site    = document.getElementById('ac-site').value.trim();
+  const symptom = (document.getElementById('ac-symptom')?.value||'').trim();
+  const cause   = (document.getElementById('ac-cause')?.value||'').trim();
+  const action  = (document.getElementById('ac-action')?.value||'').trim();
+  const result  = (document.getElementById('ac-result')?.value||'').trim();
+  const status  = document.getElementById('ac-st').value;
+  const link    = (document.getElementById('ac-link')?.value||'').trim();
+
   if(!author){ showToast(currentLang==='en'?'Enter your name':'이름을 입력하세요','err'); return; }
-  if(text.length<5){ showToast(currentLang==='en'?'Enter at least 5 characters':'5자 이상 입력하세요','err'); return; }
-  const btn=document.getElementById('ac-submit-btn');
+
+  // 4개 필드 중 하나라도 입력 필요
+  const hasContent = symptom || cause || action || result;
+  if(!hasContent){ showToast('증상/원인/조치/결과 중 하나 이상 입력하세요','err'); return; }
+
+  const btn = document.getElementById('ac-submit-btn');
   if(btn){ btn.disabled=true; btn.textContent=t('saving'); }
+
   sS('vam_author',author); sS('vam_site',site);
   savedAuthor=author; savedSite=site;
+
   if(!actions[k]) actions[k]=[];
   const now=new Date();
   const dateStr=now.toISOString().slice(0,10)+' '+now.toTimeString().slice(0,5);
-  const entry={author,site,text,date:dateStr,status,helpful:0};
-  if(link) entry.link=link;
+
+  // 기존 text 필드 호환: 4개 필드를 합쳐서 text에도 저장 (검색/번역용)
+  const textCombined = [
+    symptom ? '증상: '+symptom : '',
+    cause   ? '원인: '+cause   : '',
+    action  ? '조치: '+action  : '',
+    result  ? '결과: '+result  : '',
+  ].filter(Boolean).join('
+');
+
+  const entry = {
+    author, site, date: dateStr, status, helpful: 0,
+    symptom, cause, action, result,
+    text: textCombined  // 기존 호환 + 검색 인덱스용
+  };
+  if(link) entry.link = link;
+
   actions[k].push(entry);
   await saveActions();
-  addAudit('조치방안 등록',k,author,'',text.slice(0,60));
+  addAudit('조치방안 등록',k,author,'',textCombined.slice(0,60));
   await saveAudit();
   updateStats();
   if(curAlarm) renderDetail(curAlarm);
