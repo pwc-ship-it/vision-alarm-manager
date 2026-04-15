@@ -35,7 +35,7 @@
 (function(){ if(typeof emailjs !== 'undefined') emailjs.init('sLxfXJSqzf_-t-Nt_'); })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260409g">
+  <link rel="stylesheet" href="style.css?v=20260415b">
 </head>
 <body>
 
@@ -47,19 +47,23 @@
 
     <!-- 로고 -->
     <div class="auth-logo">
-      <div class="auth-logo-brand-wrap">
-        <div class="logo-imark lg">
-          <div class="logo-imark-bar top"></div>
-          <div class="logo-imark-bar mid"></div>
-          <div class="logo-imark-bar bot"></div>
+      <!-- 1줄: I아이콘 + INTEK PLUS -->
+      <div class="auth-logo-row1">
+        <div class="auth-imark">
+          <div class="auth-imark-bar top"></div>
+          <div class="auth-imark-bar mid"></div>
+          <div class="auth-imark-bar bot"></div>
         </div>
-        <div class="auth-logo-text-wrap">
-          <div class="auth-logo-brand">INTEK<span class="logo-dot-sep">·</span><span class="logo-plus">PLUS</span></div>
-          <div class="auth-logo-tagline">Integrated Measurement System</div>
+        <div class="auth-brand-text">
+          INTEK&nbsp;<span class="auth-brand-plus">PLUS</span>
         </div>
       </div>
-      <div class="auth-logo-sub-line"></div>
-      <div class="auth-logo-sub">ALARM MANAGER</div>
+      <!-- 2줄: Integrated Measurement System -->
+      <div class="auth-logo-tagline">Integrated Measurement System</div>
+      <!-- 구분선 -->
+      <div class="auth-logo-divider"></div>
+      <!-- 3줄: ALARM MANAGER -->
+      <div class="auth-logo-service">ALARM MANAGER</div>
     </div>
 
     <!-- 탭 -->
@@ -771,16 +775,16 @@
 
 <div id="toast"></div>
 
-<script src="alarms.js?v=20260409g"></script>
-<script src="alarms_en.js?v=20260409g"></script>
+<script src="alarms.js?v=20260415b"></script>
+<script src="alarms_en.js?v=20260415b"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<script src="app-core.js?v=20260409g"></script>
-<script src="app-auth.js?v=20260415a"></script>
-<script src="app-render.js?v=20260409g"></script>
-<script src="app-actions.js?v=20260409g"></script>
-<script src="app-admin.js?v=20260409g"></script>
-<script src="app-ui.js?v=20260409g"></script>
-<script src="app-init.js?v=20260409g"></script>
+<script src="app-core.js?v=20260415b"></script>
+<script src="app-auth.js?v=20260415b"></script>
+<script src="app-render.js?v=20260415b"></script>
+<script src="app-actions.js?v=20260415b"></script>
+<script src="app-admin.js?v=20260415b"></script>
+<script src="app-ui.js?v=20260415b"></script>
+<script src="app-init.js?v=20260415b"></script>
 </body>
 </html>
