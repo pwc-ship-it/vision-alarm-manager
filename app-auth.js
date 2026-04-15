@@ -174,6 +174,20 @@ async function onUserSignedIn(user){
     updateTopbarUser();
     showLoggedInButtons();
 
+    // Admin 전용 버튼 표시
+    if(profile.role === 'admin'){
+      const umBtn = document.getElementById('user-manage-btn');
+      if(umBtn) umBtn.style.display = '';
+      const sesBtn = document.getElementById('session-btn');
+      if(sesBtn) sesBtn.style.display = '';
+    }
+    // Vision 필터 버튼 항상 표시
+    const vpBtn = document.getElementById('vision-personal-btn');
+    if(vpBtn) vpBtn.style.display = '';
+
+    // Vision 개인화 필터 적용
+    setTimeout(()=>applyVisionPersonalize(), 300);
+
     // 앱 초기화
     if(!appInitialized){
       await initApp();
@@ -692,4 +706,238 @@ async function initApp(){
       if(a) setTimeout(()=>selAlarm(a.id), 200);
     }
   } catch(e){ console.warn('[initApp] URL 처리 오류:', e); }
+}
+
+// ══════════════════════════════════════
+//  사용자 관리 (Admin 전용)
+// ══════════════════════════════════════
+
+// 사용자 목록 모달 열기
+async function openUserManage(){
+  if(!isAdmin){ showToast('관리자 권한 필요','err'); return; }
+  document.getElementById('user-manage-mo').classList.add('open');
+  await renderUserList();
+}
+
+function closeUserManage(){
+  document.getElementById('user-manage-mo').classList.remove('open');
+}
+
+// 사용자 목록 렌더링
+async function renderUserList(){
+  const body = document.getElementById('um-body');
+  if(!body) return;
+  body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">⏳ 불러오는 중...</div>';
+
+  try{
+    const db = firebase.database();
+    const snap = await db.ref('users').once('value');
+    const users = snap.val();
+
+    if(!users){
+      body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3)">등록된 사용자가 없습니다.</div>';
+      return;
+    }
+
+    const userList = Object.values(users);
+    // 상태별 정렬: pending 먼저, 그 다음 approved, 나머지
+    userList.sort((a,b)=>{
+      const order = {pending:0, approved:1, suspended:2, rejected:3};
+      return (order[a.status]??9) - (order[b.status]??9);
+    });
+
+    const orgTypeLabel = { headquarter:'본사', outsource:'외주', customer:'고객사' };
+    const statusLabel  = { pending:'승인대기', approved:'승인', suspended:'정지', rejected:'거절' };
+    const statusColor  = { pending:'var(--yellow)', approved:'var(--green)', suspended:'var(--red)', rejected:'var(--text3)' };
+
+    body.innerHTML = userList.map(u => {
+      const isSelf = u.uid === currentUser?.uid;
+      const lastLogin = u.lastLogin ? u.lastLogin.slice(0,16).replace('T',' ') : '없음';
+      const orgLabel  = orgTypeLabel[u.orgType] || u.orgType;
+      const stLabel   = statusLabel[u.status]   || u.status;
+      const stColor   = statusColor[u.status]   || 'var(--text3)';
+
+      return `
+      <div class="um-row" id="um-${u.uid}">
+        <div class="um-info">
+          <div class="um-name">
+            ${esc(u.name)}
+            ${isSelf ? '<span style="font-size:10px;color:var(--accent);margin-left:4px">(나)</span>' : ''}
+            ${u.role==='admin' ? '<span style="font-size:10px;color:var(--yellow);margin-left:4px">ADMIN</span>' : ''}
+          </div>
+          <div class="um-detail">
+            <span>${esc(u.email)}</span>
+            <span>${esc(u.org)} · ${orgLabel}</span>
+            <span>마지막 로그인: ${lastLogin}</span>
+          </div>
+        </div>
+        <div class="um-actions">
+          <span class="um-status" style="color:${stColor}">${stLabel}</span>
+          ${!isSelf ? `
+            ${u.status==='pending'  ? `<button class="btn sm primary" onclick="updateUserStatus('${u.uid}','approved')">✅ 승인</button>` : ''}
+            ${u.status==='pending'  ? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','rejected')" style="color:var(--red);border-color:rgba(255,77,106,.3)">❌ 거절</button>` : ''}
+            ${u.status==='approved' ? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','suspended')" style="color:var(--red);border-color:rgba(255,77,106,.3)">🚫 정지</button>` : ''}
+            ${u.status==='suspended'? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','approved')">🔓 정지해제</button>` : ''}
+            ${u.status==='rejected' ? `<button class="btn sm" onclick="updateUserStatus('${u.uid}','approved')">↩️ 재승인</button>` : ''}
+            ${u.role!=='admin' ? `<button class="btn sm" onclick="updateUserRole('${u.uid}','admin')" style="color:var(--yellow);border-color:rgba(255,179,71,.3)">⭐ Admin</button>` : ''}
+            ${u.role==='admin' ? `<button class="btn sm" onclick="updateUserRole('${u.uid}','member')" style="color:var(--text3)">👤 일반</button>` : ''}
+          ` : '<span style="font-size:10px;color:var(--text3)">본인 계정</span>'}
+        </div>
+      </div>`;
+    }).join('');
+
+    // 승인대기 건수 표시
+    const pendingCnt = userList.filter(u=>u.status==='pending').length;
+    const cntEl = document.getElementById('um-pending-cnt');
+    if(cntEl){
+      cntEl.textContent = pendingCnt > 0 ? `승인대기 ${pendingCnt}명` : '';
+      cntEl.style.color = pendingCnt > 0 ? 'var(--yellow)' : '';
+    }
+
+  } catch(e){
+    console.error('[UserManage] 오류:', e);
+    body.innerHTML = `<div style="color:var(--red);padding:20px">오류: ${e.message}</div>`;
+  }
+}
+
+// 사용자 상태 변경 (승인/거절/정지)
+async function updateUserStatus(uid, newStatus){
+  const statusMsg = {
+    approved:  '승인하시겠습니까?',
+    rejected:  '거절하시겠습니까?',
+    suspended: '정지하시겠습니까?',
+  };
+  if(!confirm(statusMsg[newStatus] || '변경하시겠습니까?')) return;
+
+  try{
+    const db = firebase.database();
+    await db.ref('users/' + uid + '/status').set(newStatus);
+
+    // 감사 로그
+    addAudit('사용자 상태 변경', uid, currentUserProfile.name, '', newStatus);
+    await saveAudit();
+
+    showToast(`✅ ${newStatus === 'approved' ? '승인' : newStatus === 'rejected' ? '거절' : '정지'} 완료`, 'ok');
+    await renderUserList(); // 목록 새로고침
+
+    // 승인 시 EmailJS로 알림 (선택)
+    if(newStatus === 'approved'){
+      try{
+        const snap = await db.ref('users/' + uid).once('value');
+        const profile = snap.val();
+        if(profile && profile.email){
+          await emailjs.send(
+            'service_p8md6zd',
+            'template_x6qowo8',
+            {
+              to_email:      profile.email,
+              name:          'Vision Alarm Manager',
+              user_name:     profile.name,
+              user_org:      profile.org,
+              user_org_type: profile.orgType,
+              user_email:    profile.email,
+              request_time:  '가입 승인 완료'
+            },
+            'sLxfXJSqzf_-t-Nt_'
+          );
+        }
+      } catch(e){ console.warn('[EmailJS] 승인 알림 실패:', e); }
+    }
+  } catch(e){
+    showToast('❌ 변경 실패: ' + e.message, 'err');
+  }
+}
+
+// 사용자 권한 변경 (admin/member)
+async function updateUserRole(uid, newRole){
+  const msg = newRole === 'admin' ? 'Admin 권한을 부여하시겠습니까?' : 'Admin 권한을 해제하시겠습니까?';
+  if(!confirm(msg)) return;
+
+  try{
+    const db = firebase.database();
+    await db.ref('users/' + uid + '/role').set(newRole);
+
+    addAudit('사용자 권한 변경', uid, currentUserProfile.name, '', newRole);
+    await saveAudit();
+
+    showToast(`✅ ${newRole === 'admin' ? 'Admin 권한 부여' : '일반 사용자로 변경'} 완료`, 'ok');
+    await renderUserList();
+  } catch(e){
+    showToast('❌ 변경 실패: ' + e.message, 'err');
+  }
+}
+
+// ══════════════════════════════════════
+//  Vision 개인화 필터
+// ══════════════════════════════════════
+
+function openVisionPersonalize(){
+  if(!currentUserProfile) return;
+  const mo = document.getElementById('vision-personal-mo');
+  if(!mo) return;
+
+  const myVisions = currentUserProfile.visibleVisions || ['ALL'];
+  const allVisions = getVisionList();
+
+  document.getElementById('vp-list').innerHTML = allVisions.map(v => `
+    <label class="vp-item">
+      <input type="checkbox" value="${v}"
+        ${myVisions.includes('ALL') || myVisions.includes(v) ? 'checked' : ''}>
+      <span>${v}</span>
+    </label>
+  `).join('') + `
+    <label class="vp-item" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+      <input type="checkbox" id="vp-all" ${myVisions.includes('ALL') ? 'checked' : ''}
+        onchange="toggleVpAll(this)">
+      <span style="color:var(--accent)">전체 보기</span>
+    </label>
+  `;
+
+  mo.classList.add('open');
+}
+
+function toggleVpAll(cb){
+  const items = document.querySelectorAll('#vp-list input[type="checkbox"]:not(#vp-all)');
+  items.forEach(i => i.checked = cb.checked);
+}
+
+async function saveVisionPersonalize(){
+  const allCb = document.getElementById('vp-all');
+  let visions;
+
+  if(allCb && allCb.checked){
+    visions = ['ALL'];
+  } else {
+    visions = Array.from(
+      document.querySelectorAll('#vp-list input[type="checkbox"]:not(#vp-all):checked')
+    ).map(i => i.value);
+    if(visions.length === 0) visions = ['ALL'];
+  }
+
+  try{
+    const db = firebase.database();
+    await db.ref('users/' + currentUser.uid + '/visibleVisions').set(visions);
+    currentUserProfile.visibleVisions = visions;
+
+    closeModal('vision-personal-mo');
+    applyVisionPersonalize();
+    showToast('✅ Vision 설정 저장됨', 'ok');
+  } catch(e){
+    showToast('❌ 저장 실패: ' + e.message, 'err');
+  }
+}
+
+// Vision 개인화 필터 적용
+function applyVisionPersonalize(){
+  if(!currentUserProfile) return;
+  const myVisions = currentUserProfile.visibleVisions || ['ALL'];
+  if(myVisions.includes('ALL')) return; // 전체 보기면 필터 없음
+
+  // Vision 선택 드롭다운에서 해당 Vision만 표시
+  const selV = document.getElementById('sel-v');
+  if(!selV) return;
+  Array.from(selV.options).forEach(opt => {
+    if(opt.value === '') return; // 전체 옵션 유지
+    opt.style.display = myVisions.includes(opt.value) ? '' : 'none';
+  });
 }
