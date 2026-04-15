@@ -37,8 +37,7 @@ const EMAILJS_PUBLIC_KEY  = 'sLxfXJSqzf_-t-Nt_';
 // ══════════════════════════════════════
 const PW_POLICY = {
   minLen:    8,
-  hasUpper:  /[A-Z]/,
-  hasLower:  /[a-z]/,
+  hasLower:  /[a-zA-Z]/,
   hasNumber: /[0-9]/,
   hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/
 };
@@ -46,7 +45,6 @@ const PW_POLICY = {
 function checkPasswordPolicy(pw){
   return {
     minLen:    pw.length >= PW_POLICY.minLen,
-    hasUpper:  PW_POLICY.hasUpper.test(pw),
     hasLower:  PW_POLICY.hasLower.test(pw),
     hasNumber: PW_POLICY.hasNumber.test(pw),
     hasSpecial: PW_POLICY.hasSpecial.test(pw)
@@ -622,8 +620,7 @@ function onPwInput(pw, prefix){
   const r = checkPasswordPolicy(pw);
   const items = [
     { id: prefix + '-p-len',     ok: r.minLen,    text: '8자 이상' },
-    { id: prefix + '-p-upper',   ok: r.hasUpper,  text: '영문 대문자 포함' },
-    { id: prefix + '-p-lower',   ok: r.hasLower,  text: '영문 소문자 포함' },
+    { id: prefix + '-p-lower',   ok: r.hasLower,  text: '영문 포함 (대/소문자)' },
     { id: prefix + '-p-num',     ok: r.hasNumber, text: '숫자 포함' },
     { id: prefix + '-p-special', ok: r.hasSpecial,text: '특수문자 포함 (!@#$% 등)' },
   ];
