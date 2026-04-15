@@ -547,8 +547,7 @@ async function saveEditAction(k,idx){
       cause  ?'원인: '+cause  :'',
       action ?'조치: '+action :'',
       result ?'결과: '+result :'',
-    ].filter(Boolean).join('
-');
+    ].filter(Boolean).join('\n');
     ac.edited = new Date().toISOString().slice(0,16).replace('T',' ');
     await saveActions();
     addAudit('조치방안 수정',k,ac.author,before,ac.text.slice(0,60));
@@ -652,8 +651,7 @@ async function addAction(k){
     cause   ? '원인: '+cause   : '',
     action  ? '조치: '+action  : '',
     result  ? '결과: '+result  : '',
-  ].filter(Boolean).join('
-');
+  ].filter(Boolean).join('\n');
 
   const entry = {
     author, site, date: dateStr, status, helpful: 0,
