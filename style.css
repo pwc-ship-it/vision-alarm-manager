@@ -636,3 +636,91 @@ html[lang="en"] .icv{font-size:11px;line-height:1.5;white-space:pre-wrap}
 }
 .reset-success-icon{font-size:40px;margin-bottom:12px}
 .reset-success-msg{font-size:13px;color:var(--text2);line-height:1.7}
+
+/* ── 로그인 화면 로고 (원본 이미지 스타일) ── */
+.auth-logo{
+  text-align:center;
+  margin-bottom:24px;
+}
+.auth-logo-row1{
+  display:inline-flex;align-items:center;gap:10px;
+  margin-bottom:4px;
+}
+.auth-imark{
+  display:flex;flex-direction:column;gap:4px;
+}
+.auth-imark-bar{
+  background:var(--accent);border-radius:1.5px;
+}
+.auth-imark-bar.top{ width:22px;height:3.5px; }
+.auth-imark-bar.mid{ width:13px;height:3.5px;margin-left:4.5px; }
+.auth-imark-bar.bot{ width:22px;height:3.5px; }
+.auth-brand-text{
+  font-size:22px;font-weight:700;
+  color:#fff;letter-spacing:3px;
+  font-family:'Noto Sans KR',sans-serif;
+  line-height:1;
+}
+.auth-brand-plus{
+  color:var(--accent);
+}
+.auth-logo-tagline{
+  font-size:9px;color:var(--text3);
+  letter-spacing:3px;text-transform:uppercase;
+  margin-bottom:10px;
+}
+.auth-logo-divider{
+  width:80px;height:1px;
+  background:var(--border2);
+  margin:0 auto 8px;
+}
+.auth-logo-service{
+  font-size:11px;font-weight:600;
+  color:var(--text2);letter-spacing:5px;
+  text-transform:uppercase;
+}
+
+/* ══════════════════════════════════════
+   사용자 관리 모달
+   ══════════════════════════════════════ */
+#user-manage-mo .md{ max-width:700px; }
+.um-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);margin-bottom:6px;gap:12px;flex-wrap:wrap;
+}
+.um-row:hover{ border-color:var(--border2); }
+.um-info{ flex:1;min-width:0; }
+.um-name{
+  font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;
+}
+.um-detail{
+  display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--text3);
+}
+.um-actions{
+  display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0;
+}
+.um-status{
+  font-size:11px;font-weight:600;padding:2px 8px;
+  border-radius:10px;background:var(--bg4);
+}
+
+/* Vision 개인화 모달 */
+#vision-personal-mo .md{ max-width:400px; }
+.vp-item{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 10px;border-radius:var(--r);cursor:pointer;
+  font-size:13px;color:var(--text2);transition:background .15s;
+}
+.vp-item:hover{ background:var(--bg3); }
+.vp-item input[type="checkbox"]{
+  width:15px;height:15px;accent-color:var(--accent);cursor:pointer;
+}
+
+/* topbar 사용자 관리 버튼 알림 뱃지 */
+.um-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--red);color:#fff;font-size:9px;font-weight:700;
+  margin-left:3px;vertical-align:middle;
+}
