@@ -403,11 +403,17 @@ function selAlarm(id){
 // ══════════════════════════════════════
 function renderDetail(a){
   const g=ga(a), k=ak(a), isFav=favorites.includes(k);
-  const acts=(actions[k]||[]).filter(Boolean).slice().sort((x,y)=>
-    sortDescAct === 'desc' ? new Date(y.date)-new Date(x.date) :
-    sortDescAct === 'asc'  ? new Date(x.date)-new Date(y.date) :
-    (y.helpful||0)-(x.helpful||0)
+  // 원본 인덱스 보존 후 정렬 (수정/삭제 시 올바른 인덱스 참조)
+  const actsWithIdx = (actions[k]||[])
+    .map((ac, realIdx) => ({ac, realIdx}))
+    .filter(x => x.ac);
+  actsWithIdx.sort((x,y)=>
+    sortDescAct === 'desc' ? new Date(y.ac.date)-new Date(x.ac.date) :
+    sortDescAct === 'asc'  ? new Date(x.ac.date)-new Date(y.ac.date) :
+    (y.ac.helpful||0)-(x.ac.helpful||0)
   );
+  const acts = actsWithIdx.map(x=>x.ac);
+  const actsRealIdx = actsWithIdx.map(x=>x.realIdx);
   const relLinks=(g.related_alarms||'').split(/[,\n]/).map(s=>{
     const m=s.trim().match(/\d+/); if(!m) return esc(s.trim());
     const code=parseInt(m[0]);
@@ -473,7 +479,7 @@ function renderDetail(a){
           </select>`:''}
         </div>
         <div class="al" id="al-${k}" style="margin-top:9px">
-          ${acts.length?acts.map((ac,i)=>actCard(ac,k,i,acts)).join('')
+          ${acts.length?acts.map((ac,i)=>actCard(ac,k,actsRealIdx[i],acts)).join('')
             :`<div style="color:var(--text3);font-size:12px;padding:6px 0">${t('no_actions')}</div>`}
         </div>
         <div class="af" style="margin-top:10px">
