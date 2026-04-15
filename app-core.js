@@ -152,7 +152,11 @@ async function initFirebase(){
   console.log('[Firebase] 연결 시도:', FB_URL);
   setDbStatus('loading');
   try{
-    const testUrl = FB_URL + '/.json?shallow=true';
+    // Auth 토큰 포함해서 연결 테스트
+    const token = await getAuthToken();
+    const testUrl = token
+      ? FB_URL + '/.json?shallow=true&auth=' + token
+      : FB_URL + '/.json?shallow=true';
     const r = await fetch(testUrl);
     console.log('[Firebase] 응답 상태:', r.status, r.ok);
     if(!r.ok){
