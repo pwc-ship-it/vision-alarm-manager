@@ -47,10 +47,19 @@
 
     <!-- 로고 -->
     <div class="auth-logo">
-      <div class="auth-logo-title">
-        INTEK<span>PLUS</span> &nbsp; ALARM Manager
+      <div class="auth-logo-brand-wrap">
+        <div class="logo-imark lg">
+          <div class="logo-imark-bar top"></div>
+          <div class="logo-imark-bar mid"></div>
+          <div class="logo-imark-bar bot"></div>
+        </div>
+        <div class="auth-logo-text-wrap">
+          <div class="auth-logo-brand">INTEK<span class="logo-dot-sep">·</span><span class="logo-plus">PLUS</span></div>
+          <div class="auth-logo-tagline">Integrated Measurement System</div>
+        </div>
       </div>
-      <div class="auth-logo-sub">VISION INSPECTION SYSTEM</div>
+      <div class="auth-logo-sub-line"></div>
+      <div class="auth-logo-sub">ALARM MANAGER</div>
     </div>
 
     <!-- 탭 -->
@@ -183,7 +192,7 @@
 <!-- ════════════════════════════════════
      PENDING SCREEN — 승인 대기
      ════════════════════════════════════ -->
-<div id="pending-screen">
+<div id="pending-screen" style="display:none">
   <div class="pending-box">
     <div class="pending-icon">⏳</div>
     <div class="pending-title">가입 승인 대기 중</div>
@@ -200,11 +209,21 @@
   </div>
 </div>
 
-<div id="app">
+<div id="app" style="display:none">
 
 <!-- TOPBAR -->
 <div id="topbar">
-  <div class="logo"><span class="logo-dot"></span><span class="logo-intekplus">INTEK<span>PLUS</span></span><span class="logo-sep"></span><span class="logo-alarm">ALARM</span><span class="logo-manager">Manager</span></div>
+  <div class="logo">
+    <div class="logo-imark">
+      <div class="logo-imark-bar top"></div>
+      <div class="logo-imark-bar mid"></div>
+      <div class="logo-imark-bar bot"></div>
+    </div>
+    <div class="logo-text-wrap">
+      <div class="logo-brand">INTEK<span class="logo-dot-sep">·</span><span class="logo-plus">PLUS</span></div>
+      <div class="logo-tagline">Integrated Measurement System</div>
+    </div>
+  </div>
   <div id="db-status" class="loading" onclick="openFbSetup()" title="Firebase 연결 상태 · 클릭하여 설정">
     <span class="db-dot"></span><span id="db-txt">⏳ 연결 중...</span>
   </div>
