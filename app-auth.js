@@ -89,15 +89,22 @@ function initAuth(){
 async function onUserSignedIn(user){
   currentUser = user;
   try{
-    const dbUrl = 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
+    console.log('[Auth] 프로필 조회 시작:', user.uid);
 
-    // 프로필 조회 (보안규칙 열려있으므로 토큰 불필요)
-    const resp = await fetch(`${dbUrl}/users/${user.uid}.json`);
-    const text = await resp.text();
-    console.log('[Auth] 프로필 응답:', resp.status, text.slice(0,100));
-
+    // Firebase Database SDK로 프로필 조회 (fetch 대신)
     let profile = null;
-    try{ profile = JSON.parse(text); } catch(e){ console.error('[Auth] JSON 파싱 오류:', e); }
+    try{
+      const db  = firebase.database();
+      const ref = db.ref('users/' + user.uid);
+      const snap = await ref.once('value');
+      profile = snap.val();
+      console.log('[Auth] 프로필 조회 완료:', profile ? '성공' : 'null');
+    } catch(e){
+      console.error('[Auth] DB SDK 조회 실패:', e);
+      // fallback: fbGet 시도
+      profile = await fbGet('users/' + user.uid);
+      console.log('[Auth] fbGet fallback:', profile ? '성공' : 'null');
+    }
 
     // 프로필이 없는 경우 (비정상)
     if(!profile || !profile.status){
@@ -135,15 +142,8 @@ async function onUserSignedIn(user){
 
     // 마지막 로그인 시간 기록
     try{
-      const idToken2 = await user.getIdToken();
-      const dbUrl2 = (typeof FB_URL !== 'undefined' && FB_URL)
-        ? FB_URL
-        : 'https://vision-alarm-manager-default-rtdb.asia-southeast1.firebasedatabase.app';
-      await fetch(`${dbUrl2}/users/${user.uid}.json?auth=${idToken2}`, {
-        method: 'PATCH',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ lastLogin: new Date().toISOString() })
-      });
+      const db = firebase.database();
+      await db.ref('users/' + user.uid + '/lastLogin').set(new Date().toISOString());
     } catch(e){ console.warn('[Auth] lastLogin 업데이트 실패:', e); }
 
     // isAdmin 전역 변수 동기화 (기존 코드 호환)
