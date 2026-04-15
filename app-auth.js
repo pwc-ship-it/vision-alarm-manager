@@ -66,13 +66,11 @@ let firebaseAuth = null;
 function initAuth(){
   try{
     firebaseAuth = firebase.auth();
-
-    // 세션 persistence: 탭 닫으면 로그아웃 (SESSION 방식)
-    firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
-      .catch(e => console.warn('[Auth] persistence 설정 실패:', e));
+    console.log('[Auth] Firebase Auth 초기화 시작');
 
     // 인증 상태 변경 감지
     firebaseAuth.onAuthStateChanged(async (user) => {
+      console.log('[Auth] onAuthStateChanged:', user ? user.uid : 'null');
       if(user){
         await onUserSignedIn(user);
       } else {
@@ -202,8 +200,10 @@ async function doLogin(){
   }
   setAuthLoading(true);
   try{
-    await firebaseAuth.signInWithEmailAndPassword(email, pw);
-    // onAuthStateChanged 에서 처리
+    const cred = await firebaseAuth.signInWithEmailAndPassword(email, pw);
+    console.log('[Auth] 로그인 성공:', cred.user.uid);
+    // onAuthStateChanged 에서 처리되지만 직접도 호출 (안전장치)
+    if(cred.user) await onUserSignedIn(cred.user);
   } catch(e){
     setAuthLoading(false);
     const msg = authErrMsg(e.code);
