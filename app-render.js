@@ -101,12 +101,22 @@ function applyFilters(){
   // 모바일 필터 시트가 열려있을 경우 m-v / m-t 값을 우선 사용
   const mobV = document.getElementById('m-v');
   const mobT = document.getElementById('m-t');
-  const v  = (mobV && document.getElementById('mob-sheet').style.display==='flex')
+  const mobS = document.getElementById('m-s');
+  const mobU = document.getElementById('m-u');
+  const mobSheetOpen = document.getElementById('mob-sheet').style.display==='flex';
+  const v  = (mobV && mobSheetOpen)
              ? mobV.value
              : document.getElementById('sel-v').value;
-  const tp = (mobT && document.getElementById('mob-sheet').style.display==='flex')
+  const tp = (mobT && mobSheetOpen)
              ? mobT.value
              : document.getElementById('sel-t').value;
+  // 사이트/호기 필터는 Trouble 타입일 때만 유효
+  const siteFilter = (tp === 'Trouble')
+    ? ((mobS && mobSheetOpen) ? (mobS.value||'') : (document.getElementById('sel-s')?.value||''))
+    : '';
+  const unitFilter = (tp === 'Trouble' && siteFilter)
+    ? ((mobU && mobSheetOpen) ? (mobU.value||'') : (document.getElementById('sel-u')?.value||''))
+    : '';
   const raw = (document.getElementById('srch').value||'').trim().replace(/\s+/g,' ').toLowerCase();
   const qTerms = raw ? raw.split(' ').filter(Boolean) : [];
   const sort=document.getElementById('sort-sel').value;
@@ -182,6 +192,9 @@ function applyFilters(){
     if(v&&g.vision!==v) return;
     if(tp&&g.type!==tp) return;
     if(sevFilter&&g.severity!==sevFilter) return;
+    // Trouble 전용: 사이트/호기 필터
+    if(siteFilter && (g.tr_site||'') !== siteFilter) return;
+    if(unitFilter && (g.tr_unit||'') !== unitFilter) return;
     const k=ak(a); const acts=actions[k]||[];
     if(noActOnly&&acts.length>0) return;
 
@@ -265,6 +278,79 @@ function setSev(btn,val){
   sevFilter=val;
   document.querySelectorAll('#sidebar .pills .pill').forEach(p=>p.classList.remove('on'));
   btn.classList.add('on'); applyFilters();
+}
+
+// ── SITE / UNIT 필터 (Trouble 전용) ──
+// 사이드바 사이트 select 옵션 채우기 (siteUnits 로드 후 호출)
+function renderSiteFilterOptions(){
+  const sel = document.getElementById('sel-s');
+  if(!sel) return;
+  const cur = sel.value;
+  const allLabel = currentLang==='en' ? 'All Sites' : '전체 사이트';
+  const sites = (typeof siteUnits !== 'undefined' && Array.isArray(siteUnits)) ? siteUnits : [];
+  sel.innerHTML = `<option value="">${allLabel}</option>`
+    + sites.map(su => `<option value="${esc(su.site)}"${su.site===cur?' selected':''}>${esc(su.site)}</option>`).join('');
+}
+
+// 사이트 선택 → 호기 옵션 채우기
+function renderUnitFilterOptions(site){
+  const sel = document.getElementById('sel-u');
+  if(!sel) return;
+  const cur = sel.value;
+  const allLabel = currentLang==='en' ? 'All Lines' : '전체 호기';
+  const su = (typeof siteUnits !== 'undefined' && Array.isArray(siteUnits))
+    ? siteUnits.find(x=>x.site===site) : null;
+  if(!site || !su || !su.units.length){
+    sel.innerHTML = `<option value="">${allLabel}</option>`;
+    sel.value = '';
+    return;
+  }
+  const units = (typeof sortUnits === 'function') ? sortUnits(su.units) : [...su.units];
+  sel.innerHTML = `<option value="">${allLabel}</option>`
+    + units.map(u => `<option value="${esc(u)}"${u===cur?' selected':''}>${esc(u)}</option>`).join('');
+}
+
+// 타입 변경 시 사이트/호기 select show/hide
+function onSelTypeChange(){
+  const tp = document.getElementById('sel-t').value;
+  const selS = document.getElementById('sel-s');
+  const selU = document.getElementById('sel-u');
+  const isTrouble = (tp === 'Trouble');
+  if(selS){
+    if(isTrouble){
+      renderSiteFilterOptions();
+      selS.style.display = '';
+    } else {
+      selS.style.display = 'none';
+      selS.value = '';
+    }
+  }
+  if(selU){
+    // 호기는 사이트가 선택된 경우만 표시
+    if(isTrouble && selS && selS.value){
+      renderUnitFilterOptions(selS.value);
+      selU.style.display = '';
+    } else {
+      selU.style.display = 'none';
+      selU.value = '';
+    }
+  }
+  applyFilters();
+}
+
+// 사이트 select 변경 → 호기 옵션 갱신
+function onSelSiteChange(){
+  const selS = document.getElementById('sel-s');
+  const selU = document.getElementById('sel-u');
+  if(!selS || !selU) return;
+  if(selS.value){
+    renderUnitFilterOptions(selS.value);
+    selU.style.display = '';
+  } else {
+    selU.style.display = 'none';
+    selU.value = '';
+  }
+  applyFilters();
 }
 
 // ── RENDER LIST ──
