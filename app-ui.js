@@ -27,10 +27,16 @@ function mobNav(page,btn){
     // 현재 필터 상태 반영
     const curV = document.getElementById('sel-v').value;
     const curT = document.getElementById('sel-t').value;
+    const curS = document.getElementById('sel-s')?.value || '';
+    const curU = document.getElementById('sel-u')?.value || '';
     const curQ = document.getElementById('srch').value;
     const curNA = document.getElementById('noact-f').checked;
     const visions = getVisionList();
     const types = getTypeList();
+    const isTrouble = curT === 'Trouble';
+    const sites = (typeof siteUnits !== 'undefined' && Array.isArray(siteUnits)) ? siteUnits : [];
+    const curSiteUnits = curS ? (sites.find(x=>x.site===curS)?.units || []) : [];
+    const sortedUnits = (typeof sortUnits === 'function') ? sortUnits(curSiteUnits) : [...curSiteUnits];
 
     document.getElementById('mob-sheet').style.display='flex';
     document.getElementById('mob-sheet').innerHTML=`
@@ -39,9 +45,18 @@ function mobNav(page,btn){
         <option value="">${t('all_vision')}</option>
         ${visions.map(v=>`<option value="${v}"${v===curV?' selected':''}>${v}</option>`).join('')}
       </select>
-      <select class="fc" id="m-t" onchange="syncM()">
+      <select class="fc" id="m-t" onchange="onMobTypeChange()">
         <option value="">${t('all_type')}</option>
         ${types.map(tp=>`<option value="${tp}"${tp===curT?' selected':''}>${tp}</option>`).join('')}
+      </select>
+      <!-- Trouble 전용: 사이트 / 호기 -->
+      <select class="fc" id="m-s" onchange="onMobSiteChange()" style="${isTrouble?'':'display:none'}">
+        <option value="">${currentLang==='en'?'All Sites':'전체 사이트'}</option>
+        ${sites.map(su=>`<option value="${esc(su.site)}"${su.site===curS?' selected':''}>${esc(su.site)}</option>`).join('')}
+      </select>
+      <select class="fc" id="m-u" onchange="syncM()" style="${(isTrouble && curS)?'':'display:none'}">
+        <option value="">${currentLang==='en'?'All Lines':'전체 호기'}</option>
+        ${sortedUnits.map(u=>`<option value="${esc(u)}"${u===curU?' selected':''}>${esc(u)}</option>`).join('')}
       </select>
       <div class="sbl">${t('mob_keyword')}</div>
       <input class="fc" type="text" id="m-q" placeholder="${t('search_ph')}" value="${esc(curQ)}" oninput="syncM()">
@@ -116,6 +131,9 @@ function mobNav(page,btn){
 
       <!-- Admin 전용 -->
       ${adm ? `
+      <button class="btn" style="${btnStyle};border-color:rgba(255,179,71,.3);color:var(--yellow)" onclick="closeMoreSheet();openVisionManage()">
+        ⚙️ ${currentLang==='en'?'Item Manage':'항목 관리'}
+      </button>
       <button class="btn" style="${btnStyle};border-color:rgba(255,179,71,.3);color:var(--yellow)" onclick="closeMoreSheet();openUserManage()">
         👥 사용자 관리
         ${typeof checkPendingUsers !== 'undefined' ? '' : ''}
@@ -165,6 +183,8 @@ function closeMoreSheet(){
 function syncM(){
   const v=document.getElementById('m-v')?.value||'';
   const tp=document.getElementById('m-t')?.value||'';
+  const s=document.getElementById('m-s')?.value||'';
+  const u=document.getElementById('m-u')?.value||'';
   const q=document.getElementById('m-q')?.value||'';
   const na=document.getElementById('m-na')?.checked||false;
 
@@ -172,6 +192,8 @@ function syncM(){
   // value 직접 설정 후 강제로 option selected 상태도 맞춤
   const selV = document.getElementById('sel-v');
   const selT = document.getElementById('sel-t');
+  const selS = document.getElementById('sel-s');
+  const selU = document.getElementById('sel-u');
   if(selV){
     selV.value = v;
     // value 설정이 안 먹힐 경우 대비: option을 직접 selected 처리
@@ -181,9 +203,92 @@ function syncM(){
     selT.value = tp;
     Array.from(selT.options).forEach(o => o.selected = (o.value === tp));
   }
+  // 사이트: 사이드바 select는 Trouble일 때만 옵션 채워져 있음
+  if(selS){
+    const isTrouble = (tp === 'Trouble');
+    if(isTrouble){
+      if(typeof renderSiteFilterOptions === 'function') renderSiteFilterOptions();
+      selS.style.display = '';
+      selS.value = s;
+      Array.from(selS.options).forEach(o => o.selected = (o.value === s));
+    } else {
+      selS.style.display = 'none';
+      selS.value = '';
+    }
+  }
+  if(selU){
+    const isTrouble = (tp === 'Trouble');
+    if(isTrouble && s){
+      if(typeof renderUnitFilterOptions === 'function') renderUnitFilterOptions(s);
+      selU.style.display = '';
+      selU.value = u;
+      Array.from(selU.options).forEach(o => o.selected = (o.value === u));
+    } else {
+      selU.style.display = 'none';
+      selU.value = '';
+    }
+  }
   document.getElementById('srch').value=q;
   document.getElementById('noact-f').checked=na;
   applyFilters();
+}
+
+// 모바일 필터: 타입 변경 시 사이트/호기 select show/hide
+function onMobTypeChange(){
+  const tp = document.getElementById('m-t')?.value || '';
+  const mS = document.getElementById('m-s');
+  const mU = document.getElementById('m-u');
+  const isTrouble = (tp === 'Trouble');
+  if(mS){
+    if(isTrouble){
+      // 옵션이 비어있으면 다시 그리기
+      if(mS.options.length <= 1){
+        const sites = (typeof siteUnits !== 'undefined' && Array.isArray(siteUnits)) ? siteUnits : [];
+        const allLabel = currentLang==='en' ? 'All Sites' : '전체 사이트';
+        mS.innerHTML = `<option value="">${allLabel}</option>`
+          + sites.map(su=>`<option value="${esc(su.site)}">${esc(su.site)}</option>`).join('');
+      }
+      mS.style.display = '';
+    } else {
+      mS.style.display = 'none';
+      mS.value = '';
+    }
+  }
+  if(mU){
+    if(isTrouble && mS && mS.value){
+      mU.style.display = '';
+    } else {
+      mU.style.display = 'none';
+      mU.value = '';
+    }
+  }
+  syncM();
+}
+
+// 모바일 필터: 사이트 변경 시 호기 옵션 갱신
+function onMobSiteChange(){
+  const mS = document.getElementById('m-s');
+  const mU = document.getElementById('m-u');
+  if(!mS || !mU) return;
+  const site = mS.value;
+  const allLabel = currentLang==='en' ? 'All Lines' : '전체 호기';
+  if(site){
+    const sites = (typeof siteUnits !== 'undefined' && Array.isArray(siteUnits)) ? siteUnits : [];
+    const su = sites.find(x=>x.site===site);
+    if(su && su.units.length){
+      const units = (typeof sortUnits === 'function') ? sortUnits(su.units) : [...su.units];
+      mU.innerHTML = `<option value="">${allLabel}</option>`
+        + units.map(u=>`<option value="${esc(u)}">${esc(u)}</option>`).join('');
+      mU.style.display = '';
+    } else {
+      mU.innerHTML = `<option value="">${allLabel}</option>`;
+      mU.style.display = '';
+    }
+  } else {
+    mU.style.display = 'none';
+    mU.value = '';
+  }
+  syncM();
 }
 
 function setMS(btn,val){
