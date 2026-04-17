@@ -297,7 +297,9 @@ async function addNewAlarm(){
   const dup = alarms.find(a=>a.vision===vision&&a.type===type&&a.code===code);
   if(dup){ showToast(`${currentLang==='en'?'Duplicate code: ':'이미 존재하는 코드입니다: '}(${vision} ${type} C${code})`,'err'); return; }
 
-  const newId = Math.max(...alarms.map(a=>a.id).concat([0])) + 1;
+  // 커스텀 알람 id는 9001번대로 고정 (일반 알람 1~283과 충돌 방지)
+  const customIds = alarms.filter(a=>a.isCustom).map(a=>a.id);
+  const newId = Math.max(9000, ...customIds.concat([9000])) + 1;
   const createdDate = document.getElementById('na-created-date')?.value || new Date().toISOString().slice(0,10);
   const newAlarm = {
     id:newId, vision, type, code, name,
@@ -569,7 +571,8 @@ function handleUpload(event){
         data.slice(hr+1).forEach(row=>{
           const code=parseInt(row[0]); if(isNaN(code)) return;
           if(alarms.find(a=>ak(a)===vision+'_'+type+'_'+code)) return;
-          const newId=Math.max(...alarms.map(a=>a.id))+1;
+          const customIds2=alarms.filter(a=>a.isCustom).map(a=>a.id);
+          const newId=Math.max(9000,...customIds2.concat([9000]))+1;
           alarms.push({id:newId,vision,type,code,name:String(row[1]||''),
             direct_cause:String(row[2]||''),occurrence:String(row[3]||''),
             influence:String(row[4]||''),related_alarms:String(row[5]||''),
