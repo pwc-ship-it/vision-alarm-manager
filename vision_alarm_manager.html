@@ -278,8 +278,15 @@
         <option>NotchingVision</option><option>FoilVision</option>
         <option>DelaminationVision</option><option>NGVision</option>
       </select>
-      <select class="fc" id="sel-t" onchange="applyFilters()">
+      <select class="fc" id="sel-t" onchange="onSelTypeChange()">
         <option value="">전체 타입</option><option>HOST</option><option>Vision</option><option>Trouble</option>
+      </select>
+      <!-- Trouble 선택 시만 표시되는 사이트/호기 필터 -->
+      <select class="fc" id="sel-s" onchange="onSelSiteChange()" style="display:none">
+        <option value="">전체 사이트</option>
+      </select>
+      <select class="fc" id="sel-u" onchange="applyFilters()" style="display:none">
+        <option value="">전체 호기</option>
       </select>
     </div>
     <div class="sbs">
@@ -515,8 +522,8 @@
     </div>
 
     <!-- 코드 / 이름 -->
-    <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px">
-      <div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px" id="na-code-row">
+      <div id="na-code-wrap">
         <label style="font-size:10px;color:var(--text3);margin-bottom:3px;display:block">알람 코드</label>
         <input class="fc" type="number" id="na-code" placeholder="없으면 자동부여" style="margin-bottom:0">
       </div>
