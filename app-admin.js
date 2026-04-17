@@ -164,6 +164,16 @@ function onNaTypeChange(){
   const isTrouble = type === 'Trouble';
   document.getElementById('na-normal-fields').style.display = isTrouble ? 'none' : '';
   document.getElementById('na-trouble-fields').style.display = isTrouble ? '' : 'none';
+  // Trouble은 비전별 자동 채번이므로 코드 입력란을 숨김 (남은 '알람명' 필드는 전체 폭)
+  const codeWrap = document.getElementById('na-code-wrap');
+  const codeRow  = document.getElementById('na-code-row');
+  if(codeWrap) codeWrap.style.display = isTrouble ? 'none' : '';
+  if(codeRow)  codeRow.style.gridTemplateColumns = isTrouble ? '1fr' : '1fr 2fr';
+  // Trouble 모드 진입 시 코드 값 초기화 (자동 채번 사용)
+  if(isTrouble){
+    const codeEl = document.getElementById('na-code');
+    if(codeEl) codeEl.value = '';
+  }
 }
 
 function renderSiteSelect(selId='na-site', selectedSite=''){
@@ -297,9 +307,7 @@ async function addNewAlarm(){
   const dup = alarms.find(a=>a.vision===vision&&a.type===type&&a.code===code);
   if(dup){ showToast(`${currentLang==='en'?'Duplicate code: ':'이미 존재하는 코드입니다: '}(${vision} ${type} C${code})`,'err'); return; }
 
-  // 커스텀 알람 id는 9001번대로 고정 (일반 알람 1~283과 충돌 방지)
-  const customIds = alarms.filter(a=>a.isCustom).map(a=>a.id);
-  const newId = Math.max(9000, ...customIds.concat([9000])) + 1;
+  const newId = Math.max(...alarms.map(a=>a.id).concat([0])) + 1;
   const createdDate = document.getElementById('na-created-date')?.value || new Date().toISOString().slice(0,10);
   const newAlarm = {
     id:newId, vision, type, code, name,
@@ -571,8 +579,7 @@ function handleUpload(event){
         data.slice(hr+1).forEach(row=>{
           const code=parseInt(row[0]); if(isNaN(code)) return;
           if(alarms.find(a=>ak(a)===vision+'_'+type+'_'+code)) return;
-          const customIds2=alarms.filter(a=>a.isCustom).map(a=>a.id);
-          const newId=Math.max(9000,...customIds2.concat([9000]))+1;
+          const newId=Math.max(...alarms.map(a=>a.id))+1;
           alarms.push({id:newId,vision,type,code,name:String(row[1]||''),
             direct_cause:String(row[2]||''),occurrence:String(row[3]||''),
             influence:String(row[4]||''),related_alarms:String(row[5]||''),
