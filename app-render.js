@@ -167,6 +167,7 @@ function applyFilters(){
       // 트러블 필드
       if(g.tr_desc && g.tr_desc.toLowerCase().includes(term))           score += 80;
       if((g.tr_keywords||[]).some(k=>k.toLowerCase().includes(term)))   score += 100;
+      if(g.tr_author && g.tr_author.toLowerCase().includes(term))       score += 40;
 
       // 조치방안 4개 필드 + 기존 text
       for(const ac of acts){
@@ -208,7 +209,7 @@ function applyFilters(){
         const allFields = [
           String(g.code), g.name||'', g.direct_cause||'', g.occurrence||'',
           g.influence||'', g.related_alarms||'', g.log||'',
-          g.tr_site||'', g.tr_unit||'', g.tr_desc||'',
+          g.tr_site||'', g.tr_unit||'', g.tr_desc||'', g.tr_author||'',
           (g.tr_keywords||[]).join(' '),
           acts.map(x=>[x.text,x.symptom,x.cause,x.action,x.result,x.author].filter(Boolean).join(' ')).join(' ')
         ].join(' ').toLowerCase();
@@ -538,6 +539,7 @@ function renderDetail(a){
           ${g.tr_site?`<div class="ic"><div class="icl">${t('tr_site')}</div><div class="icv">${esc(g.tr_site)}</div></div>`:''}
           ${g.tr_unit?`<div class="ic"><div class="icl">${t('tr_unit')}</div><div class="icv">${esc(g.tr_unit)}</div></div>`:''}
           <div class="ic"><div class="icl">${t('resolution_time')}</div><div class="icv">${(g.tr_hour||0)+t('hour')+' '+(g.tr_min||0)+t('minute')}</div></div>
+          <div class="ic"><div class="icl">${t('tr_author')}</div><div class="icv">${g.tr_author?esc(g.tr_author):`<span style="color:var(--text3);font-style:italic">${t('author_unset')}</span>`}</div></div>
           ${g.tr_keywords&&g.tr_keywords.length?`<div class="ic f"><div class="icl">${t('tr_keywords')}</div><div class="icv">${g.tr_keywords.map(kw=>`<span style="background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:11px;margin-right:3px">${esc(kw)}</span>`).join('')}</div></div>`:''}
           ${g.tr_desc?`<div class="ic f"><div class="icl">${t('tr_desc')}</div><div class="icv">${enText(g.tr_desc)}</div></div>`:''}
           ${g.direct_cause?`<div class="ic f"><div class="icl">${t('direct_cause')}</div><div class="icv">${enText(g.direct_cause)}</div></div>`:''}
@@ -583,19 +585,19 @@ function renderDetail(a){
           </div>
           <div class="ac-fields">
             <div class="ac-field-row">
-              <label class="ac-field-lbl ac-symptom-lbl">🔴 증상</label>
+              <label class="ac-field-lbl ac-symptom-lbl">🔴 증상 *</label>
               <textarea id="ac-symptom" placeholder="어떤 증상이 발생했나요?" rows="2" class="ac-field-ta"></textarea>
             </div>
             <div class="ac-field-row">
-              <label class="ac-field-lbl ac-cause-lbl">🔍 원인</label>
+              <label class="ac-field-lbl ac-cause-lbl">🔍 원인 *</label>
               <textarea id="ac-cause" placeholder="원인이 무엇인지 확인한 내용" rows="2" class="ac-field-ta"></textarea>
             </div>
             <div class="ac-field-row">
-              <label class="ac-field-lbl ac-action-lbl">🔧 조치</label>
+              <label class="ac-field-lbl ac-action-lbl">🔧 조치 *</label>
               <textarea id="ac-action" placeholder="어떻게 조치했나요? (절차 포함)" rows="2" class="ac-field-ta"></textarea>
             </div>
             <div class="ac-field-row">
-              <label class="ac-field-lbl ac-result-lbl">✅ 결과</label>
+              <label class="ac-field-lbl ac-result-lbl">✅ 결과 *</label>
               <textarea id="ac-result" placeholder="조치 후 결과는?" rows="2" class="ac-field-ta"></textarea>
             </div>
           </div>
@@ -698,19 +700,19 @@ function showEditAction(k,idx){
     ${isNewFmt ? `
       <div class="ac-fields">
         <div class="ac-field-row">
-          <label class="ac-field-lbl ac-symptom-lbl">🔴 증상</label>
+          <label class="ac-field-lbl ac-symptom-lbl">🔴 증상 *</label>
           <textarea id="ea-symptom-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.symptom||'')}</textarea>
         </div>
         <div class="ac-field-row">
-          <label class="ac-field-lbl ac-cause-lbl">🔍 원인</label>
+          <label class="ac-field-lbl ac-cause-lbl">🔍 원인 *</label>
           <textarea id="ea-cause-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.cause||'')}</textarea>
         </div>
         <div class="ac-field-row">
-          <label class="ac-field-lbl ac-action-lbl">🔧 조치</label>
+          <label class="ac-field-lbl ac-action-lbl">🔧 조치 *</label>
           <textarea id="ea-action-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.action||'')}</textarea>
         </div>
         <div class="ac-field-row">
-          <label class="ac-field-lbl ac-result-lbl">✅ 결과</label>
+          <label class="ac-field-lbl ac-result-lbl">✅ 결과 *</label>
           <textarea id="ea-result-${k}-${idx}" class="ac-field-ta" rows="2" style="${inpStyle}">${esc(ac.result||'')}</textarea>
         </div>
       </div>
@@ -748,9 +750,11 @@ async function saveEditAction(k,idx){
     const cause   = document.getElementById(`ea-cause-${k}-${idx}`)?.value.trim()||'';
     const action  = document.getElementById(`ea-action-${k}-${idx}`)?.value.trim()||'';
     const result  = document.getElementById(`ea-result-${k}-${idx}`)?.value.trim()||'';
-    if(!symptom && !cause && !action && !result){
-      showToast('하나 이상 입력하세요','err'); return;
-    }
+    // ═══════ 증상+원인+조치+결과 4개 필드 모두 필수 ═══════
+    if(!symptom){ showToast(currentLang==='en'?'Enter symptom':'증상을 입력하세요','err'); return; }
+    if(!cause){   showToast(currentLang==='en'?'Enter cause':'원인을 입력하세요','err');   return; }
+    if(!action){  showToast(currentLang==='en'?'Enter action':'조치 내용을 입력하세요','err'); return; }
+    if(!result){  showToast(currentLang==='en'?'Enter result':'결과를 입력하세요','err');   return; }
     const before = ac.text?.slice(0,60)||'';
     ac.symptom = symptom; ac.cause = cause;
     ac.action  = action;  ac.result = result;
@@ -849,9 +853,11 @@ async function addAction(k){
 
   if(!author){ showToast(currentLang==='en'?'Enter your name':'이름을 입력하세요','err'); return; }
 
-  // 4개 필드 중 하나라도 입력 필요
-  const hasContent = symptom || cause || action || result;
-  if(!hasContent){ showToast('증상/원인/조치/결과 중 하나 이상 입력하세요','err'); return; }
+  // ═══════ 증상+원인+조치+결과 4개 필드 모두 필수 ═══════
+  if(!symptom){ showToast(currentLang==='en'?'Enter symptom':'증상을 입력하세요','err'); document.getElementById('ac-symptom')?.focus(); return; }
+  if(!cause){   showToast(currentLang==='en'?'Enter cause':'원인을 입력하세요','err');   document.getElementById('ac-cause')?.focus(); return; }
+  if(!action){  showToast(currentLang==='en'?'Enter action':'조치 내용을 입력하세요','err'); document.getElementById('ac-action')?.focus(); return; }
+  if(!result){  showToast(currentLang==='en'?'Enter result':'결과를 입력하세요','err');   document.getElementById('ac-result')?.focus(); return; }
 
   const btn = document.getElementById('ac-submit-btn');
   if(btn){ btn.disabled=true; btn.textContent=t('saving'); }
