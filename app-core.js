@@ -337,6 +337,8 @@ const I18N = {
     tr_time:            '조치 시간',
     tr_keywords:        '키워드',
     tr_desc:            '발생 현상',
+    tr_author:          '작성자',
+    author_unset:       '작성자 미지정',
     reg_date:           '등록일',
     // 기타
     loading:            '로딩 중...',
@@ -491,6 +493,8 @@ const I18N = {
     tr_time:            'Resolution Time',
     tr_keywords:        'Keywords',
     tr_desc:            'Description',
+    tr_author:          'Author',
+    author_unset:       'Not set',
     reg_date:           'Registered',
     // 기타
     loading:            'Loading...',
