@@ -234,6 +234,20 @@ function openAddAlarmModal(){
   // 등록일 오늘 날짜 디폴트
   const dateEl=document.getElementById('na-created-date');
   if(dateEl) dateEl.value=new Date().toISOString().slice(0,10);
+  // ═══════ 작성자: 로그인 프로필 이름 자동 입력 (읽기 전용) ═══════
+  const authorEl=document.getElementById('na-author');
+  if(authorEl){
+    const myName = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : '';
+    authorEl.value = myName;
+    authorEl.readOnly = true;  // 신규 등록 시에는 로그인 이름 고정
+    authorEl.style.opacity = '0.7';
+    authorEl.title = currentLang==='en' ? 'Auto-filled from login' : '로그인 계정에서 자동 입력됨';
+  }
+  const authorHint=document.getElementById('na-author-hint');
+  if(authorHint){
+    authorHint.textContent = currentLang==='en' ? 'Auto-filled from login' : '로그인 계정 자동 입력';
+    authorHint.style.color = 'var(--text3)';
+  }
   renderSiteSelect();
   renderUnitSelect('');
   renderVisionSelects();
@@ -279,6 +293,40 @@ function openEditAlarmModal(id){
     dateEl.style.opacity = isAdmin ? '1' : '0.5';
     dateEl.title = isAdmin ? '' : (currentLang==='en'?'Admin only':'관리자만 수정 가능');
   }
+  // ═══════ 작성자: 기존값 로드 + 수정 권한 제어 ═══════
+  // 권한: 본인(기존작성자 === 로그인이름) 또는 Admin, 또는 기존값 빈 경우 누구나
+  const authorEl=document.getElementById('na-author');
+  if(authorEl){
+    const oldAuthor = a.tr_author || '';
+    const myName    = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : '';
+    const canEdit   = !oldAuthor || isAdmin || (myName && myName === oldAuthor);
+    authorEl.value  = oldAuthor;
+    authorEl.readOnly = !canEdit;
+    authorEl.style.opacity = canEdit ? '1' : '0.5';
+    if(canEdit){
+      authorEl.title = currentLang==='en'
+        ? (oldAuthor ? 'You can edit (owner/admin)' : 'Empty — fill with your name')
+        : (oldAuthor ? '본인/Admin 수정 가능' : '미지정 — 본인 이름으로 채워주세요');
+    } else {
+      authorEl.title = currentLang==='en' ? 'Only owner or admin can edit' : '본인 또는 Admin만 수정 가능';
+    }
+  }
+  const authorHint=document.getElementById('na-author-hint');
+  if(authorHint){
+    const oldAuthor = a.tr_author || '';
+    const myName    = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : '';
+    const canEdit   = !oldAuthor || isAdmin || (myName && myName === oldAuthor);
+    if(!oldAuthor){
+      authorHint.textContent = currentLang==='en' ? 'Not set — fill with your name' : '미지정 — 본인 이름으로 채워주세요';
+      authorHint.style.color = 'var(--yellow)';
+    } else if(canEdit){
+      authorHint.textContent = currentLang==='en' ? (isAdmin?'Admin: can edit':'You (owner): can edit') : (isAdmin?'Admin: 수정 가능':'본인 글: 수정 가능');
+      authorHint.style.color = 'var(--text3)';
+    } else {
+      authorHint.textContent = currentLang==='en' ? 'Locked (not owner)' : '잠김 (본인 아님)';
+      authorHint.style.color = 'var(--text3)';
+    }
+  }
   renderKeywordPreview();
   onNaTypeChange();
   document.getElementById('add-alarm-mo').classList.add('open');
@@ -299,6 +347,45 @@ async function addNewAlarm(){
 
   if(!name){ showToast(currentLang==='en'?'Enter alarm/issue name':'알람명/이슈명을 입력하세요','err'); return; }
 
+  // ═══════ Trouble 필수 필드 검증 ═══════
+  // 알람코드는 항상 자동채번이므로 제외, 나머지 모든 필드 필수
+  if(isTrouble){
+    const trSite     = document.getElementById('na-site').value.trim();
+    const trUnit     = document.getElementById('na-unit').value.trim();
+    const trHourRaw  = document.getElementById('na-hour').value.trim();
+    const trMinRaw   = document.getElementById('na-min').value.trim();
+    const trKeywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const trDesc     = document.getElementById('na-desc').value.trim();
+
+    if(!trSite){
+      showToast(currentLang==='en'?'Select site':'사이트를 선택하세요','err');
+      document.getElementById('na-site')?.focus(); return;
+    }
+    if(!trUnit){
+      showToast(currentLang==='en'?'Select unit':'호기를 선택하세요','err');
+      document.getElementById('na-unit')?.focus(); return;
+    }
+    // 조치 시간: hour, min 둘 다 빈 값이면 미입력으로 판정 (0시간 0분은 허용 안 함)
+    if(trHourRaw === '' && trMinRaw === ''){
+      showToast(currentLang==='en'?'Enter resolution time':'조치 시간을 입력하세요','err');
+      document.getElementById('na-hour')?.focus(); return;
+    }
+    const trHour = parseInt(trHourRaw)||0;
+    const trMin  = parseInt(trMinRaw)||0;
+    if(trHour === 0 && trMin === 0){
+      showToast(currentLang==='en'?'Resolution time must be > 0':'조치 시간은 0보다 커야 합니다','err');
+      document.getElementById('na-hour')?.focus(); return;
+    }
+    if(trKeywords.length === 0){
+      showToast(currentLang==='en'?'Enter at least one keyword':'키워드를 하나 이상 입력하세요','err');
+      document.getElementById('na-keywords')?.focus(); return;
+    }
+    if(!trDesc){
+      showToast(currentLang==='en'?'Enter description':'발생 현상을 입력하세요','err');
+      document.getElementById('na-desc')?.focus(); return;
+    }
+  }
+
   let code = codeVal ? parseInt(codeVal) : null;
   if(!code){
     const existCodes = alarms.filter(a=>a.vision===vision&&a.type===type).map(a=>a.code);
@@ -309,6 +396,10 @@ async function addNewAlarm(){
 
   const newId = Math.max(...alarms.map(a=>a.id).concat([0])) + 1;
   const createdDate = document.getElementById('na-created-date')?.value || new Date().toISOString().slice(0,10);
+
+  // 작성자: 로그인 프로필 이름 자동 입력
+  const authorName = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : '';
+
   const newAlarm = {
     id:newId, vision, type, code, name,
     direct_cause: isTrouble?'':document.getElementById('na-cause').value.trim(),
@@ -327,12 +418,13 @@ async function addNewAlarm(){
     newAlarm.tr_min      = parseInt(document.getElementById('na-min').value)||0;
     newAlarm.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
     newAlarm.tr_desc     = document.getElementById('na-desc').value.trim();
+    newAlarm.tr_author   = authorName; // 작성자 자동 입력 (로그인 이름)
   }
 
   customAlarms.push(newAlarm);
   await saveCustomAlarms();
   rebuildAlarms();
-  addAudit('알람 추가', ak(newAlarm), currentLang==='en'?'User':'사용자', '', name);
+  addAudit('알람 추가', ak(newAlarm), authorName || (currentLang==='en'?'User':'사용자'), '', name);
   await saveAudit();
   closeModal('add-alarm-mo');
   applyFilters(); updateStats(); renderRight();
@@ -346,9 +438,49 @@ async function saveEditAlarm(id){
   const a = customAlarms[idx];
   const isTrouble = document.getElementById('na-type').value === 'Trouble';
 
+  const nameVal = document.getElementById('na-name').value.trim();
+  if(!nameVal){ showToast(currentLang==='en'?'Enter alarm/issue name':'알람명/이슈명을 입력하세요','err'); return; }
+
+  // ═══════ Trouble 필수 필드 검증 (수정 시에도 동일 적용) ═══════
+  if(isTrouble){
+    const trSite     = document.getElementById('na-site').value.trim();
+    const trUnit     = document.getElementById('na-unit').value.trim();
+    const trHourRaw  = document.getElementById('na-hour').value.trim();
+    const trMinRaw   = document.getElementById('na-min').value.trim();
+    const trKeywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const trDesc     = document.getElementById('na-desc').value.trim();
+
+    if(!trSite){
+      showToast(currentLang==='en'?'Select site':'사이트를 선택하세요','err');
+      document.getElementById('na-site')?.focus(); return;
+    }
+    if(!trUnit){
+      showToast(currentLang==='en'?'Select unit':'호기를 선택하세요','err');
+      document.getElementById('na-unit')?.focus(); return;
+    }
+    if(trHourRaw === '' && trMinRaw === ''){
+      showToast(currentLang==='en'?'Enter resolution time':'조치 시간을 입력하세요','err');
+      document.getElementById('na-hour')?.focus(); return;
+    }
+    const trHour = parseInt(trHourRaw)||0;
+    const trMin  = parseInt(trMinRaw)||0;
+    if(trHour === 0 && trMin === 0){
+      showToast(currentLang==='en'?'Resolution time must be > 0':'조치 시간은 0보다 커야 합니다','err');
+      document.getElementById('na-hour')?.focus(); return;
+    }
+    if(trKeywords.length === 0){
+      showToast(currentLang==='en'?'Enter at least one keyword':'키워드를 하나 이상 입력하세요','err');
+      document.getElementById('na-keywords')?.focus(); return;
+    }
+    if(!trDesc){
+      showToast(currentLang==='en'?'Enter description':'발생 현상을 입력하세요','err');
+      document.getElementById('na-desc')?.focus(); return;
+    }
+  }
+
   a.vision = document.getElementById('na-vision').value;
   a.type   = document.getElementById('na-type').value;
-  a.name   = document.getElementById('na-name').value.trim();
+  a.name   = nameVal;
   a.severity = isTrouble ? document.getElementById('na-sev-t').value : document.getElementById('na-sev').value;
   // Admin만 등록일 수정 가능
   if(isAdmin){
@@ -361,6 +493,7 @@ async function saveEditAlarm(id){
     a.influence       = document.getElementById('na-infl').value.trim();
     a.related_alarms  = document.getElementById('na-related').value.trim();
     delete a.tr_site; delete a.tr_unit; delete a.tr_hour; delete a.tr_min; delete a.tr_keywords; delete a.tr_desc;
+    delete a.tr_author;
   } else {
     a.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
     a.tr_unit     = document.getElementById('na-unit').value.trim().toUpperCase();
@@ -368,12 +501,28 @@ async function saveEditAlarm(id){
     a.tr_min      = parseInt(document.getElementById('na-min').value)||0;
     a.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
     a.tr_desc     = document.getElementById('na-desc').value.trim();
+
+    // ═══════ 작성자 수정 권한: 본인(=기존작성자) 또는 Admin, 또는 기존에 작성자 없는 경우 누구나 ═══════
+    const authorEl  = document.getElementById('na-author');
+    const newAuthor = authorEl ? authorEl.value.trim() : '';
+    const oldAuthor = a.tr_author || '';
+    const myName    = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : '';
+    // 편집 허용 조건:
+    // 1) 기존 작성자 미지정 (빈 값) → 누구나 채울 수 있음
+    // 2) Admin 권한
+    // 3) 본인 (현재 로그인 이름 === 기존 작성자)
+    const canEditAuthor = !oldAuthor || isAdmin || (myName && myName === oldAuthor);
+    if(canEditAuthor){
+      a.tr_author = newAuthor; // 빈 값도 허용 (Admin이 지울 수도 있음)
+    }
+    // 편집 권한 없으면 기존 값 유지 (변경 무시)
   }
 
   customAlarms[idx] = a;
   await saveCustomAlarms();
   rebuildAlarms();
-  addAudit('알람 수정', ak(a), currentLang==='en'?'User':'사용자', '', a.name);
+  const actor = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : (currentLang==='en'?'User':'사용자');
+  addAudit('알람 수정', ak(a), actor, '', a.name);
   await saveAudit();
   closeModal('add-alarm-mo');
   applyFilters(); updateStats(); renderRight();
