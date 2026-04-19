@@ -718,6 +718,48 @@
 </div>
 
 
+<!-- 프로필 수정 모달 -->
+<div class="mo" id="profile-edit-mo">
+  <div class="md" style="max-width:440px">
+    <div class="md-t" id="profile-edit-title">👤 내 정보 수정</div>
+
+    <!-- admin이 다른 사용자 수정 시 표시할 배지 -->
+    <div id="profile-edit-target-info" style="display:none;background:rgba(255,179,71,.1);border:1px solid rgba(255,179,71,.3);border-radius:var(--r);padding:8px 10px;margin-bottom:12px;font-size:12px;color:var(--yellow)"></div>
+
+    <div class="auth-form-group">
+      <label>이름 <span style="color:var(--red)">*</span></label>
+      <input class="auth-inp" type="text" id="pe-name" placeholder="이름" maxlength="40">
+    </div>
+
+    <div class="auth-form-group">
+      <label>소속 / 회사</label>
+      <input class="auth-inp" type="text" id="pe-org" placeholder="소속 또는 회사명" maxlength="60">
+    </div>
+
+    <div class="auth-form-group">
+      <label>이메일 <span style="font-size:11px;color:var(--text3)">(읽기 전용 — Firebase 인증 계정)</span></label>
+      <input class="auth-inp" type="email" id="pe-email" readonly style="opacity:.6;cursor:not-allowed">
+    </div>
+
+    <!-- Admin 전용 필드 -->
+    <div id="pe-admin-fields" style="display:none">
+      <div class="auth-form-group">
+        <label>소속 구분 <span style="font-size:11px;color:var(--yellow)">(Admin만 수정)</span></label>
+        <select class="auth-inp" id="pe-orgtype">
+          <option value="headquarter">본사 (Headquarter)</option>
+          <option value="outsource">협력사 (Outsource)</option>
+          <option value="customer">고객사 (Customer)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="md-a">
+      <button class="btn" onclick="closeModal('profile-edit-mo')">취소</button>
+      <button class="btn primary" id="pe-save-btn" onclick="saveProfileEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 비밀번호 변경 모달 -->
 <div class="mo" id="chpw-mo">
   <div class="md" style="max-width:400px">
