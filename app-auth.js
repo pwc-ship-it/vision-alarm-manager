@@ -1115,6 +1115,16 @@ async function _openProfileEditModal(profile){
   const mo = document.getElementById('profile-edit-mo');
   if(!mo) return;
 
+  // ═══════════════════════════════════════════════════════════
+  //  모달을 body의 최하단으로 이동 → 다른 열린 모달 위에 표시되도록
+  //  (z-index가 동일한 여러 모달이 겹칠 때 DOM 순서로 결정됨)
+  // ═══════════════════════════════════════════════════════════
+  if(mo.parentNode && mo.parentNode !== document.body){
+    document.body.appendChild(mo);
+  } else if(mo.parentNode === document.body){
+    document.body.appendChild(mo); // 재부착하여 DOM 최하단으로
+  }
+
   const isSelf = !profileEditTargetUid;
   const isAdmin = currentUserProfile && currentUserProfile.role === 'admin';
 
