@@ -15,12 +15,14 @@ function hasUnsavedAlarmInput(){
   });
 }
 
-// ─── 모달 닫기: 작성 중 내용이 있으면 확인 후 닫기 ───
-function closeModal(id){
+// ─── 모달 닫기 ───
+// force=true: 등록 성공 등 프로그램 경로에서 호출 시 확인창 건너뜀
+// force=false(기본): 사용자가 취소/ESC 등으로 닫을 때 → 작성 중 내용 있으면 확인창
+function closeModal(id, force){
   const el = document.getElementById(id);
   if(!el) return;
-  // 신규/수정 알람 모달은 작성 중 내용 보호
-  if(id === 'add-alarm-mo' && hasUnsavedAlarmInput()){
+  // force 모드이거나 신규/수정 알람 모달이 아니면 그냥 닫기
+  if(!force && id === 'add-alarm-mo' && hasUnsavedAlarmInput()){
     const msg = (typeof currentLang !== 'undefined' && currentLang === 'en')
       ? 'You have unsaved changes. Close anyway?'
       : '작성 중인 내용이 있습니다. 정말 닫으시겠습니까?';
