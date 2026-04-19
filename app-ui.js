@@ -167,6 +167,12 @@ function mobNav(page,btn){
         🔭 Vision 필터 설정
       </button>
 
+      <!-- 내 정보 수정 -->
+      ${profile ? `
+      <button class="btn" style="${btnStyle}" onclick="closeMoreSheet();openMyProfileEdit()">
+        👤 내 정보 수정
+      </button>` : ''}
+
       <!-- Admin 전용 -->
       ${adm ? `
       <button class="btn" style="${btnStyle};border-color:rgba(255,179,71,.3);color:var(--yellow)" onclick="closeMoreSheet();openVisionManage()">
