@@ -35,7 +35,7 @@ function openModal(id){
 //  로그인 후 버튼 표시 처리
 // ══════════════════════════════════════
 function showLoggedInButtons(){
-  const ids = ['tb-username','logout-btn','chpw-btn'];
+  const ids = ['tb-username','logout-btn','chpw-btn','profile-edit-btn'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if(el) el.style.display = '';
