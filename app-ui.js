@@ -4,8 +4,44 @@
 // ══════════════════════════════════════
 //  MODALS / TOAST
 // ══════════════════════════════════════
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-document.addEventListener('click',e=>{ if(e.target.classList.contains('mo')) e.target.classList.remove('open'); });
+
+// ─── 작성 중 내용이 있는지 확인 ───
+// add-alarm-mo 에서 아래 필드 중 하나라도 입력 중이면 true
+function hasUnsavedAlarmInput(){
+  const ids = ['na-name','na-cause','na-occur','na-infl','na-related','na-keywords','na-desc'];
+  return ids.some(id => {
+    const el = document.getElementById(id);
+    return el && String(el.value || '').trim().length > 0;
+  });
+}
+
+// ─── 모달 닫기: 작성 중 내용이 있으면 확인 후 닫기 ───
+function closeModal(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  // 신규/수정 알람 모달은 작성 중 내용 보호
+  if(id === 'add-alarm-mo' && hasUnsavedAlarmInput()){
+    const msg = (typeof currentLang !== 'undefined' && currentLang === 'en')
+      ? 'You have unsaved changes. Close anyway?'
+      : '작성 중인 내용이 있습니다. 정말 닫으시겠습니까?';
+    if(!confirm(msg)) return;
+  }
+  el.classList.remove('open');
+}
+
+// ─── 배경 클릭으로 모달 닫는 기능 제거 ───
+// 사용자가 드래그/실수로 배경 클릭 시 창이 사라지는 문제를 방지하기 위해
+// 모달은 "취소" 버튼 또는 ESC 키로만 닫을 수 있도록 함
+// (기존: document.addEventListener('click', e => { if(e.target.classList.contains('mo')) e.target.classList.remove('open'); });)
+
+// ─── ESC 키로 가장 위의 열린 모달 닫기 (closeModal 경유) ───
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  const opened = document.querySelectorAll('.mo.open');
+  if(!opened.length) return;
+  const top = opened[opened.length - 1];
+  if(top.id) closeModal(top.id);
+});
 
 let toastT;
 function showToast(msg,type=''){
