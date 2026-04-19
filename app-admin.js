@@ -386,50 +386,257 @@ async function addNewAlarm(){
     }
   }
 
-  let code = codeVal ? parseInt(codeVal) : null;
-  if(!code){
-    const existCodes = alarms.filter(a=>a.vision===vision&&a.type===type).map(a=>a.code);
-    code = Math.max(9000, ...existCodes.filter(c=>c>=9000).concat([9000])) + 1;
-  }
-  const dup = alarms.find(a=>a.vision===vision&&a.type===type&&a.code===code);
-  if(dup){ showToast(`${currentLang==='en'?'Duplicate code: ':'이미 존재하는 코드입니다: '}(${vision} ${type} C${code})`,'err'); return; }
+  // ══════════════════════════════════════════════════════════════
+  //  ★ 자동채번 + 중복방지 강화 (v2)
+  //
+  //  [목적]
+  //   - 동일 비전/타입에서 같은 code가 중복 등록되는 현상 방지
+  //   - 삭제로 생긴 중간 결번 우선 재사용 (9999 고갈 지연)
+  //   - 동시 등록(Race Condition) 시에도 충돌 자동 해소
+  //   - 실패해도 작성 내용 보존 (모달 열린 채 유지)
+  //
+  //  [전략]
+  //   1) 로컬 alarms 기준으로 9001부터 스캔하여 가장 낮은 빈 번호 할당
+  //   2) Firebase에서 customAlarms 최신본 재조회 → 서버측 중복 체크
+  //   3) 충돌 시 최신본 기준으로 다시 빈 번호 계산 → 재시도 (최대 5회)
+  //   4) 저장 시에는 로컬이 아니라 "서버 최신본 + 새 알람"을 PUT하여
+  //      다른 사용자가 거의 동시에 추가한 건을 덮어쓰지 않도록 함
+  //
+  //  [작성 내용 보존]
+  //   - 실패해도 closeModal 호출 안 함 → 모달 유지
+  //   - 입력 필드 값 그대로 남아 있으므로 사용자는 다시 등록 버튼만 누르면 됨
+  // ══════════════════════════════════════════════════════════════
 
-  const newId = Math.max(...alarms.map(a=>a.id).concat([0])) + 1;
+  // 코드 수동 입력 여부 (Trouble은 자동채번만 사용)
+  const isAutoCode = !codeVal;
+
+  // 빈 번호 우선 채번: 9001부터 스캔해서 존재하지 않는 최소값 반환
+  // (사용중 코드가 9001,9002,9004면 → 9003 반환)
+  function findLowestFreeCode(alarmList, vision, type, startFrom = 9001, maxCode = 9999){
+    const used = new Set(
+      alarmList
+        .filter(a => a.vision === vision && a.type === type)
+        .map(a => a.code)
+    );
+    for(let c = startFrom; c <= maxCode; c++){
+      if(!used.has(c)) return c;
+    }
+    return null; // 9001~9999 모두 사용중
+  }
+
+  // 동일 vision/type/code 조합이 배열에 존재하는지 확인
+  function hasDuplicateIn(alarmList, vision, type, code){
+    return alarmList.some(a => a.vision === vision && a.type === type && a.code === code);
+  }
+
+  // 알람명 기준 최종 검증 (사용자가 이미 같은 내용을 방금 등록했는지)
+  // tr_author + name + 최근 10초 이내 생성 건은 중복 제출로 간주
+  function hasRecentSameSubmission(alarmList, vision, type, name, authorName){
+    const now = Date.now();
+    return alarmList.some(a =>
+      a.vision === vision && a.type === type &&
+      (a.name || '').trim() === name &&
+      (a.tr_author || '') === (authorName || '') &&
+      a._submitTs && (now - a._submitTs) < 10000
+    );
+  }
+
+  let code = codeVal ? parseInt(codeVal) : null;
+
+  // 수동 입력한 코드는 즉시 중복 검증
+  if(code){
+    if(hasDuplicateIn(alarms, vision, type, code)){
+      showToast(`${currentLang==='en'?'Duplicate code: ':'이미 존재하는 코드입니다: '}(${vision} ${type} C${code})`,'err');
+      return; // 모달 유지, 작성 내용 보존
+    }
+  } else {
+    // 로컬에서 빈 번호 찾기
+    code = findLowestFreeCode(alarms, vision, type);
+    if(code === null){
+      showToast(currentLang==='en'
+        ? 'Code range 9001-9999 is full. Contact admin.'
+        : '코드 범위(9001~9999)가 가득 찼습니다. 관리자에게 문의하세요.', 'err');
+      return;
+    }
+  }
+
   const createdDate = document.getElementById('na-created-date')?.value || new Date().toISOString().slice(0,10);
 
   // 작성자: 로그인 프로필 이름 자동 입력
   const authorName = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : '';
 
-  const newAlarm = {
-    id:newId, vision, type, code, name,
-    direct_cause: isTrouble?'':document.getElementById('na-cause').value.trim(),
-    occurrence:   isTrouble?'':document.getElementById('na-occur').value.trim(),
-    influence:    isTrouble?'':document.getElementById('na-infl').value.trim(),
-    related_alarms: isTrouble?'':document.getElementById('na-related').value.trim(),
-    plc_output:'', timing:'', log:'',
-    severity: isTrouble ? document.getElementById('na-sev-t').value : document.getElementById('na-sev').value,
-    isCustom: true,
-    created_date: createdDate
-  };
-  if(isTrouble){
-    newAlarm.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
-    newAlarm.tr_unit     = document.getElementById('na-unit').value.trim().toUpperCase();
-    newAlarm.tr_hour     = parseInt(document.getElementById('na-hour').value)||0;
-    newAlarm.tr_min      = parseInt(document.getElementById('na-min').value)||0;
-    newAlarm.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
-    newAlarm.tr_desc     = document.getElementById('na-desc').value.trim();
-    newAlarm.tr_author   = authorName; // 작성자 자동 입력 (로그인 이름)
+  // newAlarm 팩토리 — 재시도 시 code/id만 교체하면 되도록 분리
+  function buildNewAlarm(assignedCode, assignedId){
+    const base = {
+      id: assignedId, vision, type, code: assignedCode, name,
+      direct_cause: isTrouble?'':document.getElementById('na-cause').value.trim(),
+      occurrence:   isTrouble?'':document.getElementById('na-occur').value.trim(),
+      influence:    isTrouble?'':document.getElementById('na-infl').value.trim(),
+      related_alarms: isTrouble?'':document.getElementById('na-related').value.trim(),
+      plc_output:'', timing:'', log:'',
+      severity: isTrouble ? document.getElementById('na-sev-t').value : document.getElementById('na-sev').value,
+      isCustom: true,
+      created_date: createdDate
+    };
+    if(isTrouble){
+      base.tr_site     = document.getElementById('na-site').value.trim().toUpperCase();
+      base.tr_unit     = document.getElementById('na-unit').value.trim().toUpperCase();
+      base.tr_hour     = parseInt(document.getElementById('na-hour').value)||0;
+      base.tr_min      = parseInt(document.getElementById('na-min').value)||0;
+      base.tr_keywords = document.getElementById('na-keywords').value.split(',').map(s=>s.trim()).filter(Boolean);
+      base.tr_desc     = document.getElementById('na-desc').value.trim();
+      base.tr_author   = authorName;
+    }
+    return base;
   }
 
-  customAlarms.push(newAlarm);
-  await saveCustomAlarms();
+  // ─────────────────────────────────────────────
+  //  DB 병합 저장 + 자동 재시도 루프
+  // ─────────────────────────────────────────────
+  const MAX_RETRY = 5;
+  let attempt = 0;
+  let savedAlarm = null;
+  let serverCustomAlarms = null; // 마지막으로 읽은 서버 최신본
+
+  while(attempt < MAX_RETRY){
+    attempt++;
+
+    // Firebase가 연결되어 있으면 서버 최신본으로 중복 재검증
+    if(typeof fbOnline !== 'undefined' && fbOnline && typeof fbGet === 'function'){
+      try{
+        const fresh = await fbGet('customAlarms');
+        // fbGet 은 Firebase 에서 배열/객체를 반환. 배열이 아니면 빈배열 취급
+        serverCustomAlarms = Array.isArray(fresh) ? fresh : (fresh ? Object.values(fresh).filter(Boolean) : []);
+      } catch(e){
+        console.warn('[addNewAlarm] 서버 재조회 실패, 로컬만 사용:', e);
+        serverCustomAlarms = null;
+      }
+
+      if(serverCustomAlarms){
+        // 서버 기준으로 다시 체크
+        const serverAllAlarms = [
+          ...alarms.filter(a => !a.isCustom), // RAW 기본 알람들
+          ...serverCustomAlarms               // 서버에서 가져온 최신 custom
+        ];
+
+        // 수동 입력 코드가 서버에도 이미 있으면 즉시 실패
+        if(codeVal){
+          if(hasDuplicateIn(serverAllAlarms, vision, type, code)){
+            showToast(`${currentLang==='en'?'Duplicate code (server): ':'이미 등록된 코드입니다: '}(${vision} ${type} C${code})`,'err');
+            return; // 모달 유지
+          }
+        } else {
+          // 자동채번: 서버 최신본 기준으로 빈 번호 다시 계산
+          const serverFreeCode = findLowestFreeCode(serverAllAlarms, vision, type);
+          if(serverFreeCode === null){
+            showToast(currentLang==='en'
+              ? 'Code range 9001-9999 is full. Contact admin.'
+              : '코드 범위(9001~9999)가 가득 찼습니다. 관리자에게 문의하세요.', 'err');
+            return;
+          }
+          // 서버 기준 빈 번호가 로컬과 다르면 업데이트
+          if(serverFreeCode !== code){
+            console.log(`[addNewAlarm] 코드 재조정: C${code} → C${serverFreeCode} (서버 기준)`);
+            code = serverFreeCode;
+          }
+        }
+
+        // id도 서버 최신본 기준으로 재계산
+        const maxId = Math.max(
+          0,
+          ...alarms.filter(a=>!a.isCustom).map(a=>a.id),
+          ...serverCustomAlarms.map(a=>a && a.id).filter(v => typeof v === 'number')
+        );
+        const newIdForAttempt = maxId + 1;
+
+        // 동일 사용자가 같은 알람명을 방금(<=10초) 저장한 흔적이 있으면 중복 제출로 판단
+        if(hasRecentSameSubmission(serverCustomAlarms, vision, type, name, authorName)){
+          showToast(currentLang==='en'
+            ? 'Already submitted just now. Please check the list.'
+            : '방금 등록된 동일 항목이 있습니다. 목록을 확인해주세요.', 'err');
+          return;
+        }
+
+        // 저장 시도: 서버 최신본에 새 알람을 추가한 배열을 PUT
+        const newAlarm = buildNewAlarm(code, newIdForAttempt);
+        newAlarm._submitTs = Date.now(); // 중복 제출 감지용 타임스탬프
+        const mergedArr = [...serverCustomAlarms, newAlarm];
+
+        let ok = false;
+        try{
+          ok = await fbSet('customAlarms', mergedArr);
+        } catch(e){
+          console.warn('[addNewAlarm] 저장 시도 실패:', e);
+          ok = false;
+        }
+
+        if(ok){
+          // 성공: 로컬 상태 동기화
+          customAlarms = mergedArr;
+          sS('vam_custom_alarms', customAlarms);
+          savedAlarm = newAlarm;
+          break; // 루프 탈출
+        }
+        // 실패 → 재시도 (다음 루프에서 서버 재조회 + 번호 재계산)
+        continue;
+      }
+    }
+
+    // Firebase 오프라인이거나 서버 조회 실패 → 로컬만 사용
+    const newIdLocal = Math.max(0, ...alarms.map(a=>a.id)) + 1;
+    const newAlarmLocal = buildNewAlarm(code, newIdLocal);
+    newAlarmLocal._submitTs = Date.now();
+
+    // 로컬 중복 최종 체크
+    if(hasDuplicateIn(alarms, vision, type, code)){
+      // 자동채번이면 다음 빈 번호로 재계산 후 재시도
+      if(isAutoCode){
+        const next = findLowestFreeCode(alarms, vision, type);
+        if(next === null){
+          showToast(currentLang==='en'
+            ? 'Code range 9001-9999 is full.'
+            : '코드 범위(9001~9999)가 가득 찼습니다.', 'err');
+          return;
+        }
+        code = next;
+        continue;
+      }
+      // 수동 입력인데 중복이면 실패
+      showToast(`${currentLang==='en'?'Duplicate code: ':'이미 존재하는 코드입니다: '}(${vision} ${type} C${code})`,'err');
+      return;
+    }
+
+    customAlarms.push(newAlarmLocal);
+    try{
+      await saveCustomAlarms();
+      savedAlarm = newAlarmLocal;
+      break;
+    } catch(e){
+      // 로컬 저장 실패는 드문 케이스. 롤백 후 재시도
+      console.error('[addNewAlarm] saveCustomAlarms 실패:', e);
+      customAlarms.pop();
+      continue;
+    }
+  }
+
+  // 모든 재시도 실패 → 모달 유지, 작성 내용 보존
+  if(!savedAlarm){
+    showToast(currentLang==='en'
+      ? 'Registration failed after retries. Please try again in a moment.'
+      : '동시 등록 충돌 또는 네트워크 문제로 저장에 실패했습니다. 잠시 후 다시 시도해주세요.', 'err');
+    return;
+  }
+
+  // ─────────────────────────────────────────────
+  //  저장 성공 후 후처리
+  // ─────────────────────────────────────────────
   rebuildAlarms();
-  addAudit('알람 추가', ak(newAlarm), authorName || (currentLang==='en'?'User':'사용자'), '', name);
+  addAudit('알람 추가', ak(savedAlarm), authorName || (currentLang==='en'?'User':'사용자'), '', name);
   await saveAudit();
   closeModal('add-alarm-mo');
   applyFilters(); updateStats(); renderRight();
-  showToast(`${currentLang==='en'?'Added: ':'등록됨: '}${vision.replace('Vision','')} ${type} C${code}`, 'ok');
-  setTimeout(()=>selAlarm(newId), 200);
+  showToast(`${currentLang==='en'?'Added: ':'등록됨: '}${vision.replace('Vision','')} ${type} C${savedAlarm.code}`, 'ok');
+  setTimeout(()=>selAlarm(savedAlarm.id), 200);
 }
 
 async function saveEditAlarm(id){
