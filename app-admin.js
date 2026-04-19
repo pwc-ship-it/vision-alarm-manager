@@ -633,7 +633,7 @@ async function addNewAlarm(){
   rebuildAlarms();
   addAudit('알람 추가', ak(savedAlarm), authorName || (currentLang==='en'?'User':'사용자'), '', name);
   await saveAudit();
-  closeModal('add-alarm-mo');
+  closeModal('add-alarm-mo', true); // 등록 성공 경로 — 확인창 건너뜀
   applyFilters(); updateStats(); renderRight();
   showToast(`${currentLang==='en'?'Added: ':'등록됨: '}${vision.replace('Vision','')} ${type} C${savedAlarm.code}`, 'ok');
   setTimeout(()=>selAlarm(savedAlarm.id), 200);
@@ -731,7 +731,7 @@ async function saveEditAlarm(id){
   const actor = (currentUserProfile && currentUserProfile.name) ? currentUserProfile.name : (currentLang==='en'?'User':'사용자');
   addAudit('알람 수정', ak(a), actor, '', a.name);
   await saveAudit();
-  closeModal('add-alarm-mo');
+  closeModal('add-alarm-mo', true); // 수정 성공 경로 — 확인창 건너뜀
   applyFilters(); updateStats(); renderRight();
   if(curAlarm&&curAlarm.id===id){ const upd=alarms.find(x=>x.id===id); if(upd) renderDetail(upd); }
   showToast(currentLang==='en'?'Alarm updated ✅':'알람 수정 완료 ✅', 'ok');
