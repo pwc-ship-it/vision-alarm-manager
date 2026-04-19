@@ -176,19 +176,77 @@ function onNaTypeChange(){
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+//  siteUnits 방어적 정규화 (2026-04 patch v2)
+//  - 과거 버그/백업 오염 등으로 units 속성이 없는 항목이 섞여 들어오면
+//    .length 조회 시 런타임 에러 발생 → 모달이 아예 안 열리던 문제 방지
+//  - 항목을 삭제하지 않고 가능한 한 복구
+//    · site만 있고 units가 없는 경우 → units:[] 추가
+//    · site가 문자열이 아닌 경우 → 문자열 변환 시도
+//    · 배열 자체가 비어 있으면 DEFAULT_SITE_UNITS 로 복구
+// ─────────────────────────────────────────────────────────────
+function _sanitizeSiteUnits(){
+  if(!Array.isArray(siteUnits)){
+    console.warn('[sanitizeSiteUnits] siteUnits is not an array:', siteUnits);
+    if(siteUnits && typeof siteUnits === 'object'){
+      // Firebase에서 {0:{...},1:{...}} 형태로 올 수 있음
+      try{ siteUnits = Object.values(siteUnits); }
+      catch(e){ siteUnits = []; }
+    } else {
+      siteUnits = [];
+    }
+  }
+  let touched = false;
+  siteUnits = siteUnits.map(su => {
+    if(!su || typeof su !== 'object'){
+      touched = true;
+      return null;
+    }
+    let site = su.site;
+    if(typeof site !== 'string'){
+      if(site == null) return (touched = true, null);
+      site = String(site);
+      touched = true;
+    }
+    if(!site.trim()) return (touched = true, null);
+    if(!Array.isArray(su.units)){
+      touched = true;
+      return { site, units: [] };
+    }
+    return { site, units: su.units.filter(u => typeof u === 'string' && u.trim()) };
+  }).filter(Boolean);
+
+  // 전부 사라졌으면 DEFAULT로 복구 (운영 중단 방지)
+  if(siteUnits.length === 0 && typeof DEFAULT_SITE_UNITS !== 'undefined'){
+    console.warn('[sanitizeSiteUnits] siteUnits empty after cleanup → restoring DEFAULT_SITE_UNITS');
+    siteUnits = JSON.parse(JSON.stringify(DEFAULT_SITE_UNITS));
+    touched = true;
+  }
+
+  if(touched){
+    console.warn('[sanitizeSiteUnits] repaired siteUnits. count =', siteUnits.length);
+    try{ sS('vam_site_units', siteUnits); }catch(e){}
+  }
+}
+
 function renderSiteSelect(selId='na-site', selectedSite=''){
   const el = document.getElementById(selId);
   if(!el) return;
+  _sanitizeSiteUnits();
   const placeholder = currentLang==='en' ? '-- Select --' : '-- 선택 --';
   el.innerHTML = `<option value="">${placeholder}</option>`
-    + siteUnits.map(su=>`<option value="${su.site}"${su.site===selectedSite?' selected':''}>${su.site} (${su.units.length}${currentLang==='en'?' lines':'개'})</option>`).join('');
+    + siteUnits.map(su=>{
+        const unitCount = Array.isArray(su.units) ? su.units.length : 0;
+        return `<option value="${su.site}"${su.site===selectedSite?' selected':''}>${su.site} (${unitCount}${currentLang==='en'?' lines':'개'})</option>`;
+      }).join('');
 }
 
 function renderUnitSelect(site, selId='na-unit', selectedUnit=''){
   const el = document.getElementById(selId);
   if(!el) return;
+  _sanitizeSiteUnits();
   const su = siteUnits.find(x=>x.site===site);
-  if(!su || !su.units.length){
+  if(!su || !Array.isArray(su.units) || !su.units.length){
     el.innerHTML = `<option value="">${currentLang==='en'?'-- No lines --':'-- 호기 없음 --'}</option>`;
     return;
   }
@@ -203,7 +261,8 @@ function onNaSiteChange(){
   const hint = document.getElementById('na-site-hint');
   if(hint){
     const su = siteUnits.find(x=>x.site===site);
-    hint.textContent = su ? (currentLang==='en'?`${su.units.length} lines`:`호기 ${su.units.length}개`) : '';
+    const unitCount = (su && Array.isArray(su.units)) ? su.units.length : 0;
+    hint.textContent = su ? (currentLang==='en'?`${unitCount} lines`:`호기 ${unitCount}개`) : '';
   }
 }
 
@@ -802,6 +861,7 @@ function renderTypeManageModal(){
 }
 
 function renderSiteManageModal(){
+  _sanitizeSiteUnits();
   const noSite = currentLang==='en' ? 'No sites' : '사이트 없음';
   const selectSite = currentLang==='en' ? '← Select a site' : '← 사이트를 선택하세요';
   const noUnit = currentLang==='en' ? 'No lines' : '호기 없음';
@@ -810,7 +870,7 @@ function renderSiteManageModal(){
   document.getElementById('vm-site-list').innerHTML=siteUnits.map((su,i)=>
     `<div class="vm-item ${su.site===vmCurrentSite?'on':''}" style="${su.site===vmCurrentSite?'border-color:var(--accent);background:var(--bg4)':''}" onclick="selectVmSite('${su.site}')">
       <span style="cursor:pointer;flex:1">${su.site}</span>
-      <span style="font-size:10px;color:var(--text3)">${su.units.length}${unitUnit}</span>
+      <span style="font-size:10px;color:var(--text3)">${(Array.isArray(su.units)?su.units.length:0)}${unitUnit}</span>
       <button onclick="event.stopPropagation();deleteSite(${i})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;margin-left:4px">🗑️</button>
     </div>`
   ).join('')||`<div style="font-size:11px;color:var(--text3)">${noSite}</div>`;
@@ -819,7 +879,7 @@ function renderSiteManageModal(){
   document.getElementById('vm-selected-site').textContent=vmCurrentSite?`— ${vmCurrentSite}`:'';
   document.getElementById('vm-unit-add-row').style.display=vmCurrentSite?'flex':'none';
   document.getElementById('vm-unit-list').innerHTML=vmCurrentSite
-    ? (suSel ? sortUnits(suSel.units).map((u,i)=>
+    ? (suSel && Array.isArray(suSel.units) ? sortUnits(suSel.units).map((u,i)=>
         `<div class="vm-item"><span>${u}</span><button onclick="deleteUnit('${vmCurrentSite}',${suSel.units.indexOf(u)})" style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer">🗑️</button></div>`
       ).join('')||`<div style="font-size:11px;color:var(--text3)">${noUnit}</div>` : '')
     : `<div style="font-size:11px;color:var(--text3)">${selectSite}</div>`;
