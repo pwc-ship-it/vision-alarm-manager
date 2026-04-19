@@ -128,8 +128,15 @@ function startPolling(){
       }
       if(suData && typeof suData === 'object'){
         const arr = Array.isArray(suData) ? suData : Object.values(suData).filter(x=>x&&typeof x==='object');
-        if(arr.length > 0 && JSON.stringify(arr)!==JSON.stringify(siteUnits)){
-          siteUnits=arr; sS('vam_site_units',siteUnits); changed=true;
+        // Firebase sentinel 제거 + units 배열 안전화
+        const cleaned = arr.map(su => {
+          if(!su || typeof su !== 'object' || typeof su.site !== 'string') return null;
+          let units = Array.isArray(su.units) ? su.units.slice() : [];
+          units = units.filter(u => typeof u === 'string' && u.trim() && u !== '__EMPTY__');
+          return { site: su.site, units };
+        }).filter(Boolean);
+        if(cleaned.length > 0 && JSON.stringify(cleaned)!==JSON.stringify(siteUnits)){
+          siteUnits=cleaned; sS('vam_site_units',siteUnits); changed=true;
         }
       }
       if(changed){
@@ -215,8 +222,15 @@ async function initFirebase(){
     // 빈 객체({}) 또는 null이면 DEFAULT_SITE_UNITS 유지
     if(suData && typeof suData === 'object'){
       const arr = Array.isArray(suData) ? suData : Object.values(suData).filter(x=>x&&typeof x==='object');
-      if(arr.length > 0){
-        siteUnits = arr;
+      // Firebase sentinel 제거 + units 배열 안전화
+      const cleaned = arr.map(su => {
+        if(!su || typeof su !== 'object' || typeof su.site !== 'string') return null;
+        let units = Array.isArray(su.units) ? su.units.slice() : [];
+        units = units.filter(u => typeof u === 'string' && u.trim() && u !== '__EMPTY__');
+        return { site: su.site, units };
+      }).filter(Boolean);
+      if(cleaned.length > 0){
+        siteUnits = cleaned;
         sS('vam_site_units', siteUnits);
       }
       // arr.length === 0 이면 기존 siteUnits(DEFAULT) 그대로 유지
