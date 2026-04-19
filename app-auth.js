@@ -848,7 +848,9 @@ async function renderUserList(){
             ${u.status==='rejected' ?`<button class="btn sm" onclick="updateUserStatus('${u.uid}','approved')">↩️ 재승인</button>`:''}
             ${u.role!=='admin'?`<button class="btn sm" onclick="updateUserRole('${u.uid}','admin')" style="color:var(--yellow);border-color:rgba(255,179,71,.3)">⭐ Admin</button>`:''}
             ${u.role==='admin'?`<button class="btn sm" onclick="updateUserRole('${u.uid}','member')" style="color:var(--text3)">👤 일반</button>`:''}
-          `:'<span style="font-size:10px;color:var(--text3)">본인 계정</span>'}
+            <button class="btn sm" onclick="openUserProfileEdit('${u.uid}')" title="프로필 수정">✏️ 수정</button>
+          `:`<span style="font-size:10px;color:var(--text3)">본인 계정</span>
+            <button class="btn sm" onclick="openMyProfileEdit()" title="내 정보 수정">✏️ 수정</button>`}
         </div>
       </div>`;
     }
@@ -1060,13 +1062,158 @@ async function saveVisionPersonalize(){
 function applyVisionPersonalize(){
   if(!currentUserProfile) return;
   const myVisions = currentUserProfile.visibleVisions || ['ALL'];
-  if(myVisions.includes('ALL')) return; // 전체 보기면 필터 없음
 
-  // Vision 선택 드롭다운에서 해당 Vision만 표시
+  // Vision 선택 드롭다운
   const selV = document.getElementById('sel-v');
   if(!selV) return;
+
+  if(myVisions.includes('ALL')){
+    // 전체 보기: 이전에 숨겨진 옵션들을 모두 복원 (중요: 이전 필터 해제)
+    Array.from(selV.options).forEach(opt => { opt.style.display = ''; });
+    return;
+  }
+
+  // 특정 Vision만 표시
   Array.from(selV.options).forEach(opt => {
     if(opt.value === '') return; // 전체 옵션 유지
     opt.style.display = myVisions.includes(opt.value) ? '' : 'none';
   });
+}
+
+// ══════════════════════════════════════
+//  프로필 수정 (본인 / Admin이 타 사용자 수정)
+// ══════════════════════════════════════
+
+// 수정 대상 uid (null이면 본인, 값이 있으면 Admin이 타 사용자 수정 중)
+let profileEditTargetUid = null;
+
+// 내 정보 수정 열기 (더보기 메뉴에서 호출)
+async function openMyProfileEdit(){
+  if(!currentUser || !currentUserProfile) return;
+  profileEditTargetUid = null; // 본인 수정
+  await _openProfileEditModal(currentUserProfile);
+}
+
+// Admin이 특정 사용자 프로필 수정 (사용자 관리에서 호출)
+async function openUserProfileEdit(uid){
+  if(!currentUserProfile || currentUserProfile.role !== 'admin'){
+    showToast('Admin만 사용 가능한 기능입니다', 'err'); return;
+  }
+  try{
+    const snap = await firebase.database().ref('users/' + uid).once('value');
+    const profile = snap.val();
+    if(!profile){ showToast('사용자를 찾을 수 없습니다', 'err'); return; }
+    profileEditTargetUid = uid;
+    await _openProfileEditModal(profile);
+  } catch(e){
+    showToast('사용자 정보 조회 실패: ' + e.message, 'err');
+  }
+}
+
+// 내부 함수: 모달 채우고 열기
+async function _openProfileEditModal(profile){
+  const mo = document.getElementById('profile-edit-mo');
+  if(!mo) return;
+
+  const isSelf = !profileEditTargetUid;
+  const isAdmin = currentUserProfile && currentUserProfile.role === 'admin';
+
+  // 제목
+  document.getElementById('profile-edit-title').textContent =
+    isSelf ? '👤 내 정보 수정' : '👤 사용자 정보 수정';
+
+  // 수정 대상 안내 (Admin이 타 사용자 수정 시)
+  const targetInfo = document.getElementById('profile-edit-target-info');
+  if(!isSelf){
+    targetInfo.style.display = 'block';
+    targetInfo.textContent = `⚠️ ${profile.name} (${profile.email}) 사용자의 정보를 수정합니다`;
+  } else {
+    targetInfo.style.display = 'none';
+  }
+
+  // 기본 필드 값 채우기
+  document.getElementById('pe-name').value  = profile.name  || '';
+  document.getElementById('pe-org').value   = profile.org   || '';
+  document.getElementById('pe-email').value = profile.email || '';
+
+  // Admin 전용 필드 노출 여부
+  const adminFields = document.getElementById('pe-admin-fields');
+  if(isAdmin){
+    adminFields.style.display = 'block';
+    document.getElementById('pe-orgtype').value = profile.orgType || 'headquarter';
+  } else {
+    adminFields.style.display = 'none';
+  }
+
+  mo.classList.add('open');
+}
+
+// 프로필 수정 저장
+async function saveProfileEdit(){
+  if(!currentUser || !currentUserProfile) return;
+
+  const name = document.getElementById('pe-name').value.trim();
+  const org  = document.getElementById('pe-org').value.trim();
+
+  if(!name){
+    showToast('이름을 입력하세요', 'err');
+    document.getElementById('pe-name').focus();
+    return;
+  }
+
+  const isSelf = !profileEditTargetUid;
+  const targetUid = isSelf ? currentUser.uid : profileEditTargetUid;
+  const isAdmin = currentUserProfile.role === 'admin';
+
+  // 수정할 필드만 추림 (update용 patch)
+  const patch = { name, org };
+
+  // Admin이고 Admin 전용 필드가 노출된 경우에만 orgType 포함
+  if(isAdmin){
+    const orgTypeEl = document.getElementById('pe-orgtype');
+    if(orgTypeEl && orgTypeEl.offsetParent !== null){ // 화면에 표시된 경우만
+      patch.orgType = orgTypeEl.value;
+    }
+  }
+
+  const saveBtn = document.getElementById('pe-save-btn');
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = '저장 중...'; }
+
+  try{
+    await firebase.database().ref('users/' + targetUid).update(patch);
+
+    // 감사 로그
+    if(typeof addAudit === 'function'){
+      const auditTarget = isSelf ? '' : targetUid;
+      const before = isSelf ? '' : '';
+      const after = JSON.stringify(patch);
+      addAudit(isSelf ? '내 프로필 수정' : '사용자 프로필 수정 (Admin)',
+               auditTarget, currentUserProfile.name, before, after);
+      if(typeof saveAudit === 'function') await saveAudit();
+    }
+
+    // 본인 수정 시 로컬 프로필 업데이트
+    if(isSelf){
+      Object.assign(currentUserProfile, patch);
+      // topbar 사용자 이름 업데이트
+      if(typeof updateTopbarUser === 'function') updateTopbarUser();
+      // savedAuthor 동기화
+      if(typeof savedAuthor !== 'undefined') savedAuthor = patch.name;
+      if(typeof savedSite !== 'undefined' && patch.org) savedSite = patch.org;
+    }
+
+    closeModal('profile-edit-mo', true);
+    showToast('✅ 프로필이 수정되었습니다', 'ok');
+
+    // 사용자 관리 화면이 열려있으면 목록 재렌더링
+    if(!isSelf && typeof renderUserList === 'function'){
+      try{ await renderUserList(); }catch(e){}
+    }
+  } catch(e){
+    console.error('[Profile Edit] save failed:', e);
+    showToast('❌ 저장 실패: ' + e.message, 'err');
+  } finally {
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = '저장'; }
+    profileEditTargetUid = null;
+  }
 }
