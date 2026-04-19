@@ -59,7 +59,15 @@ async function saveSiteUnits(){
   sS('vam_site_units', siteUnits);
   if(fbOnline){
     if(siteUnits.length > 0){
-      await fbSet('siteUnits', siteUnits);
+      // Firebase는 빈 배열을 저장할 때 필드를 삭제해 버리므로,
+      // units가 비어 있으면 sentinel을 넣어 보존시킨다. 로드 시 제거.
+      const sentinel = '__EMPTY__';
+      const safe = siteUnits.map(su => {
+        if(!su || typeof su !== 'object' || typeof su.site !== 'string') return su;
+        const units = Array.isArray(su.units) ? su.units.slice() : [];
+        return { site: su.site, units: units.length ? units : [sentinel] };
+      });
+      await fbSet('siteUnits', safe);
     } else {
       await fbDelete('siteUnits');
     }
